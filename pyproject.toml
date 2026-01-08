@@ -1,0 +1,89 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "facs-analyzer"
+version = "0.1.0"
+description = "Facial Action Coding System (FACS) analyzer for emotion detection"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.9"
+authors = [
+    {name = "yuuto", email = "your-email@example.com"}
+]
+keywords = [
+    "facial-expression",
+    "emotion-detection",
+    "action-units",
+    "facs",
+    "computer-vision",
+    "face-analysis"
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Image Recognition",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "numpy>=1.24.0",
+    "opencv-python>=4.8.0",
+    "mediapipe>=0.10.9",
+    "Pillow>=10.0.0",
+]
+
+[project.optional-dependencies]
+deepface = [
+    "deepface>=0.0.96",
+    "tensorflow>=2.15.0",
+    "tf-keras>=2.15.0",
+]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "mypy>=1.0.0",
+]
+all = [
+    "facs-analyzer[deepface,dev]",
+]
+
+[project.scripts]
+facs = "facs.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/yourusername/facs-analyzer"
+Documentation = "https://github.com/yourusername/facs-analyzer#readme"
+Repository = "https://github.com/yourusername/facs-analyzer"
+Issues = "https://github.com/yourusername/facs-analyzer/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["facs*"]
+
+[tool.setuptools.package-data]
+facs = ["py.typed", "models/*.task"]
+
+[tool.black]
+line-length = 100
+target-version = ['py39', 'py310', 'py311', 'py312']
+
+[tool.isort]
+profile = "black"
+line_length = 100
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
