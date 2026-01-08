@@ -1,0 +1,18 @@
+# Core
+numpy>=1.24.0
+opencv-python>=4.8.0
+
+# Face detection & analysis
+deepface>=0.0.96
+mediapipe>=0.10.9
+
+# Japanese font support
+Pillow>=10.0.0
+
+# TensorFlow & Keras (DeepFaceの依存)
+tensorflow>=2.15.0
+tf-keras>=2.15.0
+
+# Optional
+tqdm>=4.66.0
+matplotlib>=3.8.0
