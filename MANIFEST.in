@@ -1,0 +1,5 @@
+include LICENSE
+include README.md
+include requirements.txt
+recursive-include facs *.py *.typed
+recursive-include facs/models *.task
