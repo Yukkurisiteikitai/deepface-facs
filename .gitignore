@@ -9,3 +9,8 @@ __pycache__
 *.log
 *.pot
 *.mo
+.DS_Store
+.vscode
+.idea
+face_landmarker.task
+sample_image

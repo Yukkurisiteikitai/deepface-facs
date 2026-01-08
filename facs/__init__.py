@@ -1,30 +1,19 @@
-from .action_units import (
-    ActionUnit,
-    AUIntensity,
-    AU_DEFINITIONS,
-    AU_COMBINATIONS,
-    LANDMARK_NAMES
+from .core import (
+    AUIntensity, AUDetectionResult, IntensityResult,
+    EmotionResult, AnalysisResult, FaceData, TerminalDisplay
 )
-from .landmark_detector import LandmarkDetector
-from .au_detector import AUDetector, AUDetectionResult
-from .intensity_estimator import IntensityEstimator, IntensityResult
-from .emotion_mapper import EmotionMapper, EmotionResult
-from .visualizer import FACSVisualizer
+from .config import AU_DEFINITIONS, EMOTION_DEFINITIONS, LANDMARK_NAMES
+from .detectors import LandmarkDetectorFactory, FeatureExtractor, AUDetector
+from .estimators import IntensityEstimator, EmotionMapper
+from .visualization import FACSVisualizer, InteractiveFACSVisualizer
+from .analyzer import FACSAnalyzer
 
 __all__ = [
-    'ActionUnit',
-    'AUIntensity',
-    'AU_DEFINITIONS',
-    'AU_COMBINATIONS',
-    'LANDMARK_NAMES',
-    'LandmarkDetector',
-    'AUDetector',
-    'AUDetectionResult',
-    'IntensityEstimator',
-    'IntensityResult',
-    'EmotionMapper',
-    'EmotionResult',
-    'FACSVisualizer'
+    'AUIntensity', 'AUDetectionResult', 'IntensityResult', 'EmotionResult',
+    'AnalysisResult', 'FaceData', 'TerminalDisplay', 'AU_DEFINITIONS', 
+    'EMOTION_DEFINITIONS', 'LANDMARK_NAMES', 'LandmarkDetectorFactory', 
+    'FeatureExtractor', 'AUDetector', 'IntensityEstimator', 'EmotionMapper', 
+    'FACSVisualizer', 'InteractiveFACSVisualizer', 'FACSAnalyzer'
 ]
 
-__version__ = '1.0.0'
+__version__ = '2.1.0'
