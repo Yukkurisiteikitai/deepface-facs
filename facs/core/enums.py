@@ -1,21 +1,26 @@
-from enum import Enum, auto
+"""列挙型定義"""
+from enum import Enum
+
 
 class AUIntensity(Enum):
-    """AU強度スケール (FACS標準 A-E)"""
+    """AU強度スケール (FACS標準)"""
     ABSENT = 0
-    TRACE = 1       # A
-    SLIGHT = 2      # B
-    MARKED = 3      # C
-    SEVERE = 4      # D
-    MAXIMUM = 5     # E
-    
-    @property
-    def label(self) -> str:
-        labels = {0: "-", 1: "A", 2: "B", 3: "C", 4: "D", 5: "E"}
-        return labels.get(self.value, "-")
+    TRACE = 1      # A
+    SLIGHT = 2     # B
+    MARKED = 3     # C
+    SEVERE = 4     # D
+    MAXIMUM = 5    # E
+
 
 class DetectorType(Enum):
-    """ランドマーク検出器の種類"""
-    DLIB = auto()
-    MEDIAPIPE = auto()
-    OPENCV = auto()
+    """検出器タイプ"""
+    MEDIAPIPE = "mediapipe"
+    DLIB = "dlib"
+    OPENCV = "opencv"
+
+
+class AnalysisMode(Enum):
+    """分析モード"""
+    REALTIME = "realtime"      # 軽量・高速（リアルタイム向け）
+    BALANCED = "balanced"      # バランス型（デフォルト）
+    ACCURATE = "accurate"      # 高精度・低速（詳細分析向け）

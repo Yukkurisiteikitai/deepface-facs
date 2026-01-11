@@ -19,13 +19,18 @@ from pathlib import Path
 from typing import List, Optional
 from datetime import datetime
 
-from facs import FACSAnalyzer, AnalysisResult, TerminalDisplay, InteractiveFACSVisualizer
+from facs import FACSAnalyzer, AnalysisResult, TerminalDisplay, InteractiveFACSVisualizer, AnalysisMode
 
 class FACSDemo:
     """FACSデモアプリケーション"""
     
-    def __init__(self, use_mediapipe: bool = True, interactive: bool = True):
-        self.analyzer = FACSAnalyzer(use_mediapipe=use_mediapipe, interactive=interactive)
+    def __init__(self, use_mediapipe: bool = True, interactive: bool = True,
+                 mode: AnalysisMode = AnalysisMode.BALANCED):
+        self.analyzer = FACSAnalyzer(
+            use_mediapipe=use_mediapipe,
+            interactive=interactive,
+            mode=mode
+        )
         self.terminal = TerminalDisplay(use_colors=True)
         self._interactive = interactive
         self._colors = {
@@ -331,11 +336,14 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     
-    # 共通オプション
-    parser.add_argument('--no-interactive', action='store_true', help='インタラクティブモードを無効化')
-    parser.add_argument('--no-details', action='store_true', help='AU詳細表示を無効化')
-    
     subparsers = parser.add_subparsers(dest='command', help='コマンド')
+    
+    # 共通オプションを各サブパーサーに追加する関数
+    def add_common_options(subparser):
+        subparser.add_argument('--no-interactive', action='store_true', help='インタラクティブモードを無効化')
+        subparser.add_argument('--no-details', action='store_true', help='AU詳細表示を無効化')
+        subparser.add_argument('--mode', '-m', type=str, choices=['realtime', 'balanced', 'accurate'],
+                              default='balanced', help='分析モード (realtime: 高速, balanced: バランス, accurate: 高精度)')
     
     # image コマンド
     img_parser = subparsers.add_parser('image', aliases=['i'], help='画像を分析')
@@ -343,6 +351,7 @@ def main():
     img_parser.add_argument('-o', '--output', type=str, help='出力画像パス')
     img_parser.add_argument('-j', '--json', action='store_true', help='JSONを保存')
     img_parser.add_argument('-q', '--quiet', action='store_true', help='簡易出力')
+    add_common_options(img_parser)
     
     # video コマンド
     vid_parser = subparsers.add_parser('video', aliases=['v'], help='動画を分析')
@@ -350,25 +359,29 @@ def main():
     vid_parser.add_argument('-o', '--output', type=str, help='出力動画パス')
     vid_parser.add_argument('-s', '--skip', type=int, default=2, help='フレームスキップ数')
     vid_parser.add_argument('-c', '--csv', action='store_true', help='CSVを保存')
+    add_common_options(vid_parser)
     
     # realtime コマンド
     rt_parser = subparsers.add_parser('realtime', aliases=['r'], help='リアルタイム分析')
     rt_parser.add_argument('-c', '--camera', type=int, default=0, help='カメラID')
+    add_common_options(rt_parser)
     
     # compare コマンド
     cmp_parser = subparsers.add_parser('compare', aliases=['c'], help='2つの画像を比較')
     cmp_parser.add_argument('image1', type=str, help='画像1')
     cmp_parser.add_argument('image2', type=str, help='画像2')
+    add_common_options(cmp_parser)
     
     # batch コマンド
     batch_parser = subparsers.add_parser('batch', aliases=['b'], help='フォルダ内を一括分析')
     batch_parser.add_argument('folder', type=str, help='フォルダパス')
     batch_parser.add_argument('-o', '--output', type=str, help='出力フォルダ')
+    add_common_options(batch_parser)
     
     # list コマンド
     subparsers.add_parser('list', aliases=['l'], help='AU一覧を表示')
     
-    # legend コマンド（追加）
+    # legend コマンド
     subparsers.add_parser('legend', help='AU強度の凡例を表示')
     
     args = parser.parse_args()
@@ -377,18 +390,27 @@ def main():
         parser.print_help()
         print("\n使用例:")
         print("  python demo.py image face.jpg")
-        print("  python demo.py image face.jpg --no-details  # AU詳細なし")
+        print("  python demo.py image face.jpg --mode accurate  # 高精度モード")
+        print("  python demo.py image face.jpg --mode realtime  # 高速モード")
         print("  python demo.py video interview.mp4 --csv")
         print("  python demo.py realtime")
         print("  python demo.py compare happy.jpg sad.jpg")
-        print("  python demo.py legend  # 強度凡例")
+        print("  python demo.py legend")
         print("  python demo.py list")
         return
     
     interactive = not getattr(args, 'no_interactive', False)
     show_details = not getattr(args, 'no_details', False)
     
-    demo = FACSDemo(interactive=interactive)
+    # モードを解析
+    mode_map = {
+        'realtime': AnalysisMode.REALTIME,
+        'balanced': AnalysisMode.BALANCED,
+        'accurate': AnalysisMode.ACCURATE,
+    }
+    mode = mode_map.get(getattr(args, 'mode', 'balanced'), AnalysisMode.BALANCED)
+    
+    demo = FACSDemo(interactive=interactive, mode=mode)
     
     if args.command in ('image', 'i'):
         demo.analyze_image(args.path, args.output, args.json, 

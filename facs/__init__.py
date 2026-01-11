@@ -26,6 +26,7 @@ from .core import (
     FaceData,
     TerminalDisplay,
 )
+from .core.enums import AnalysisMode  # 追加
 from .config import AU_DEFINITIONS, EMOTION_DEFINITIONS, LANDMARK_NAMES
 from .detectors import (
     LandmarkDetectorFactory,
@@ -43,6 +44,7 @@ __all__ = [
     "__version__",
     # Main class
     "FACSAnalyzer",
+    "AnalysisMode",  # 追加
     # Data models
     "AUIntensity",
     "AUDetectionResult",
