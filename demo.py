@@ -20,16 +20,19 @@ from typing import List, Optional
 from datetime import datetime
 
 from facs import FACSAnalyzer, AnalysisResult, TerminalDisplay, InteractiveFACSVisualizer, AnalysisMode
+from facs.visualization.visualizer import LayoutConfig
 
 class FACSDemo:
     """FACSデモアプリケーション"""
     
     def __init__(self, use_mediapipe: bool = True, interactive: bool = True,
-                 mode: AnalysisMode = AnalysisMode.BALANCED):
+                 mode: AnalysisMode = AnalysisMode.BALANCED,
+                 layout_config: Optional[LayoutConfig] = None):
         self.analyzer = FACSAnalyzer(
             use_mediapipe=use_mediapipe,
             interactive=interactive,
-            mode=mode
+            mode=mode,
+            layout_config=layout_config
         )
         self.terminal = TerminalDisplay(use_colors=True)
         self._interactive = interactive
@@ -343,8 +346,12 @@ def main():
         subparser.add_argument('--no-interactive', action='store_true', help='インタラクティブモードを無効化')
         subparser.add_argument('--no-details', action='store_true', help='AU詳細表示を無効化')
         subparser.add_argument('--mode', '-m', type=str, choices=['realtime', 'balanced', 'accurate'],
-                              default='balanced', help='分析モード (realtime: 高速, balanced: バランス, accurate: 高精度)')
-    
+                              default='balanced', help='分析モード')
+        subparser.add_argument('--face-height', type=int, default=400,
+                              help='顔画像の目標高さ (デフォルト: 400)')
+        subparser.add_argument('--panel-width', type=int, default=420,
+                              help='パネル幅 (デフォルト: 420)')
+
     # image コマンド
     img_parser = subparsers.add_parser('image', aliases=['i'], help='画像を分析')
     img_parser.add_argument('path', type=str, help='画像パス')
@@ -410,7 +417,13 @@ def main():
     }
     mode = mode_map.get(getattr(args, 'mode', 'balanced'), AnalysisMode.BALANCED)
     
-    demo = FACSDemo(interactive=interactive, mode=mode)
+    # レイアウト設定
+    layout_config = LayoutConfig(
+        target_face_height=getattr(args, 'face_height', 400),
+        panel_width=getattr(args, 'panel_width', 420),
+    )
+    
+    demo = FACSDemo(interactive=interactive, mode=mode, layout_config=layout_config)
     
     if args.command in ('image', 'i'):
         demo.analyze_image(args.path, args.output, args.json, 

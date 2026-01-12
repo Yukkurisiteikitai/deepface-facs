@@ -8,6 +8,7 @@ from .core.enums import DetectorType, AnalysisMode
 from .detectors import LandmarkDetectorFactory, FeatureExtractor, AUDetector
 from .estimators import IntensityEstimator, EmotionMapper
 from .visualization import FACSVisualizer, InteractiveFACSVisualizer
+from .visualization.visualizer import LayoutConfig
 from .config import AU_DEFINITIONS
 
 
@@ -111,7 +112,8 @@ class FACSAnalyzer:
         use_deepface: bool = False,
         predictor_path: Optional[str] = None,
         interactive: bool = False,
-        mode: AnalysisMode = AnalysisMode.BALANCED
+        mode: AnalysisMode = AnalysisMode.BALANCED,
+        layout_config: Optional[LayoutConfig] = None
     ):
         self._mode = mode
         self._config = AnalysisModeConfig.get(mode)
@@ -122,7 +124,13 @@ class FACSAnalyzer:
         self._au_detector = AUDetector()
         self._intensity_estimator = IntensityEstimator()
         self._emotion_mapper = EmotionMapper()
-        self._visualizer = InteractiveFACSVisualizer() if interactive else FACSVisualizer()
+        
+        # レイアウト設定
+        self._layout_config = layout_config or LayoutConfig()
+        if interactive:
+            self._visualizer = InteractiveFACSVisualizer(self._layout_config)
+        else:
+            self._visualizer = FACSVisualizer(self._layout_config)
         
         # リアルタイムモード用のフィルタ
         self._temporal_filter = TemporalFilter(self._config.get("smoothing_window", 3))
