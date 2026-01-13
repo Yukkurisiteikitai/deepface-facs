@@ -25,6 +25,8 @@ from .core import (
     AnalysisResult,
     FaceData,
     TerminalDisplay,
+    ParallelFACSProcessor,
+    run_parallel_realtime,
 )
 from .core.enums import AnalysisMode  # 追加
 from .config import AU_DEFINITIONS, EMOTION_DEFINITIONS, LANDMARK_NAMES
@@ -34,6 +36,8 @@ from .detectors import (
     AUDetector,
     FaceAligner,
     FaceAlignment,
+    VectorizedAUDetector,
+    OptimizedFeatureExtractor,
 )
 from .estimators import IntensityEstimator, EmotionMapper
 from .visualization import FACSVisualizer, InteractiveFACSVisualizer
@@ -62,6 +66,8 @@ __all__ = [
     "AUDetector",
     "FaceAligner",
     "FaceAlignment",
+    "VectorizedAUDetector",
+    "OptimizedFeatureExtractor",
     # Estimators
     "IntensityEstimator",
     "EmotionMapper",
@@ -69,4 +75,7 @@ __all__ = [
     "FACSVisualizer",
     "InteractiveFACSVisualizer",
     "TerminalDisplay",
+    # Parallel Processing
+    "ParallelFACSProcessor",
+    "run_parallel_realtime",
 ]

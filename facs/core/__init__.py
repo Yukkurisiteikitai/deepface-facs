@@ -19,6 +19,7 @@ from .interfaces import (
     IAUDetectionStrategy,
 )
 from .terminal_display import TerminalDisplay
+from .parallel_processor import ParallelFACSProcessor, run_parallel_realtime
 
 __all__ = [
     "AUIntensity", "DetectorType",
@@ -28,4 +29,5 @@ __all__ = [
     "ILandmarkDetector", "IFeatureExtractor", "IAUDetector",
     "IIntensityEstimator", "IEmotionMapper", "IVisualizer", "IAUDetectionStrategy",
     "TerminalDisplay",
+    "ParallelFACSProcessor", "run_parallel_realtime",
 ]

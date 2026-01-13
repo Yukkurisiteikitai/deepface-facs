@@ -6,6 +6,8 @@ import time
 from .core.models import FaceData, AnalysisResult
 from .core.enums import DetectorType, AnalysisMode
 from .detectors import LandmarkDetectorFactory, FeatureExtractor, AUDetector
+from .detectors.vectorized_au_detector import VectorizedAUDetector
+from .detectors.optimized_feature_extractor import OptimizedFeatureExtractor
 from .estimators import IntensityEstimator, EmotionMapper
 from .visualization import FACSVisualizer, InteractiveFACSVisualizer
 from .visualization.visualizer import LayoutConfig
@@ -113,15 +115,23 @@ class FACSAnalyzer:
         predictor_path: Optional[str] = None,
         interactive: bool = False,
         mode: AnalysisMode = AnalysisMode.BALANCED,
-        layout_config: Optional[LayoutConfig] = None
+        layout_config: Optional[LayoutConfig] = None,
+        use_optimized: bool = True,  # 最適化コンポーネントを使用
     ):
         self._mode = mode
         self._config = AnalysisModeConfig.get(mode)
         
         detector_type = DetectorType.MEDIAPIPE if use_mediapipe else DetectorType.DLIB
         self._landmark_detector = LandmarkDetectorFactory.create(detector_type, predictor_path)
-        self._feature_extractor = FeatureExtractor()
-        self._au_detector = AUDetector()
+        
+        # 最適化コンポーネントを選択
+        if use_optimized:
+            self._feature_extractor = OptimizedFeatureExtractor()
+            self._au_detector = VectorizedAUDetector()
+        else:
+            self._feature_extractor = FeatureExtractor()
+            self._au_detector = AUDetector()
+        
         self._intensity_estimator = IntensityEstimator()
         self._emotion_mapper = EmotionMapper()
         

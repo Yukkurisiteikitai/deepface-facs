@@ -5,6 +5,7 @@ FACS (Facial Action Coding System) デモスクリプト
     python demo.py image face.jpg              # 画像分析
     python demo.py video video.mp4             # 動画分析
     python demo.py realtime                    # リアルタイム分析
+    python demo.py realtime --parallel         # 並列処理リアルタイム分析
     python demo.py list                        # AU一覧表示
     python demo.py compare img1.jpg img2.jpg   # 2つの表情を比較
     python demo.py batch ./images/             # フォルダ内の画像を一括分析
@@ -20,6 +21,7 @@ from typing import List, Optional
 from datetime import datetime
 
 from facs import FACSAnalyzer, AnalysisResult, TerminalDisplay, InteractiveFACSVisualizer, AnalysisMode
+from facs import ParallelFACSProcessor, run_parallel_realtime
 from facs.visualization.visualizer import LayoutConfig
 
 class FACSDemo:
@@ -185,16 +187,61 @@ class FACSDemo:
                     ','.join(f"AU{au.au_number}" for au in r.active_aus)
                 ])
     
-    def realtime_analysis(self, camera_id: int = 0):
+    def realtime_analysis(self, camera_id: int = 0, use_parallel: bool = False, 
+                          num_workers: int = 1):
         """リアルタイム分析"""
         self._print_header("リアルタイム分析")
         print("操作方法:")
         print("  q: 終了")
         print("  s: スクリーンショット保存")
         print("  r: 結果をJSON保存")
+        if use_parallel:
+            print(f"  並列処理モード（ワーカー数: {num_workers}）")
         print()
         
-        self.analyzer.analyze_realtime(camera_id)
+        if use_parallel:
+            # 並列処理モード
+            self._realtime_parallel(camera_id, num_workers)
+        else:
+            # 通常モード
+            self.analyzer.analyze_realtime(camera_id)
+    
+    def _realtime_parallel(self, camera_id: int = 0, num_workers: int = 1):
+        """並列処理でリアルタイム分析を実行"""
+        mode_str = 'realtime'  # デフォルトはリアルタイムモード
+        
+        with ParallelFACSProcessor(
+            use_mediapipe=True,
+            mode=mode_str,
+            num_workers=num_workers
+        ) as processor:
+            cap = cv2.VideoCapture(camera_id)
+            
+            if not cap.isOpened():
+                print(self._color("エラー: カメラを開けません", 'negative'))
+                return
+            
+            print("Press 'q' to quit, 's' to save screenshot")
+            
+            while True:
+                ret, frame = cap.read()
+                if not ret:
+                    break
+                
+                result, vis = processor.process_and_visualize(frame)
+                
+                cv2.imshow("FACS Parallel Realtime", vis)
+                
+                key = cv2.waitKey(1) & 0xFF
+                if key == ord('q'):
+                    break
+                elif key == ord('s'):
+                    save_path = f"facs_parallel_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+                    cv2.imwrite(save_path, vis)
+                    print(f"保存しました: {save_path}")
+            
+            cap.release()
+            cv2.destroyAllWindows()
     
     def compare_images(self, image_path1: str, image_path2: str):
         """2つの画像を比較"""
@@ -371,6 +418,10 @@ def main():
     # realtime コマンド
     rt_parser = subparsers.add_parser('realtime', aliases=['r'], help='リアルタイム分析')
     rt_parser.add_argument('-c', '--camera', type=int, default=0, help='カメラID')
+    rt_parser.add_argument('--parallel', '-p', action='store_true', 
+                          help='並列処理モードを有効化（推論と描画を分離）')
+    rt_parser.add_argument('--workers', '-w', type=int, default=1,
+                          help='ワーカープロセス数 (デフォルト: 1)')
     add_common_options(rt_parser)
     
     # compare コマンド
@@ -402,6 +453,8 @@ def main():
         print("  python demo.py video interview.mp4 --csv")
         print("  python demo.py realtime")
         print("  python demo.py compare happy.jpg sad.jpg")
+        print("  python demo.py realtime --parallel        # 並列処理モード")
+        print("  python demo.py realtime --parallel -w 2   # ワーカー2つで並列処理")
         print("  python demo.py legend")
         print("  python demo.py list")
         return
@@ -431,7 +484,9 @@ def main():
     elif args.command in ('video', 'v'):
         demo.analyze_video(args.path, args.output, args.skip, args.csv)
     elif args.command in ('realtime', 'r'):
-        demo.realtime_analysis(args.camera)
+        use_parallel = getattr(args, 'parallel', False)
+        num_workers = getattr(args, 'workers', 1)
+        demo.realtime_analysis(args.camera, use_parallel=use_parallel, num_workers=num_workers)
     elif args.command in ('compare', 'c'):
         demo.compare_images(args.image1, args.image2)
     elif args.command in ('batch', 'b'):
