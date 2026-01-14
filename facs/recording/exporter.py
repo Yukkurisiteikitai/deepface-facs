@@ -3,7 +3,7 @@ FACS記録をMP4動画としてエクスポート
 """
 import json
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional
 import cv2
 import numpy as np
 

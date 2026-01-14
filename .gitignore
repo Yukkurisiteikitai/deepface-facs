@@ -37,3 +37,4 @@ coverage.xml
 images
 .pytest_cache
 docs/
+recordings
