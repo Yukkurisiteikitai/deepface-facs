@@ -1,16 +1,40 @@
-docs
-.venv
-.mypy_cache
-__pycache__
-*.pyc
+# Build
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Python
+__pycache__/
+*.py[cod]
 *.pyo
-*.pyd
-*.sqlite3
-*.log
-*.pot
-*.mo
+.mypy_cache/
+.pytest_cache/
+
+# Virtual env
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
 .DS_Store
-.vscode
-.idea
+Thumbs.db
+
+# Project specific
 face_landmarker.task
-sample_image
+sample_image/
+*.log
+
+# Coverage
+.coverage
+htmlcov/
+coverage.xml
+
+images
+.pytest_cache
+docs/
+recordings

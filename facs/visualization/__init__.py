@@ -1,4 +1,13 @@
-from .visualizer import FACSVisualizer, InteractiveFACSVisualizer
-from .font_manager import FontManager, TextRenderer, get_text_renderer
+"""可視化モジュール"""
+from .visualizer import FACSVisualizer, InteractiveFACSVisualizer, LayoutConfig, ImageScaler
+from .components import PanelBuilder, ProgressBar, TextRenderer
 
-__all__ = ['FACSVisualizer', 'InteractiveFACSVisualizer', 'FontManager', 'TextRenderer', 'get_text_renderer']
+__all__ = [
+    "FACSVisualizer",
+    "InteractiveFACSVisualizer",
+    "LayoutConfig",
+    "ImageScaler",
+    "PanelBuilder",
+    "ProgressBar",
+    "TextRenderer",
+]
