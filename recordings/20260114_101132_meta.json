@@ -1,0 +1,12 @@
+{
+  "version": "1.0",
+  "created_at": "2026-01-14T10:11:33.654861",
+  "fps": 15.0,
+  "width": 1920,
+  "height": 1080,
+  "total_frames": 1,
+  "duration_sec": 0.07630801200866699,
+  "source": "camera",
+  "source_path": null,
+  "description": "Demo recording"
+}
