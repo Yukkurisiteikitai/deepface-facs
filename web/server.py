@@ -601,23 +601,38 @@ class FACSWebServer:
         except:
             return "127.0.0.1"
     
-    def run(self, host: str = "0.0.0.0", port: int = 8000):
+    def run(self, host: str = "0.0.0.0", port: int = 8000, use_https: bool = False):
         """サーバーを起動"""
         import uvicorn
         
         local_ip = self.get_local_ip()
+        protocol = "https" if use_https else "http"
+        
         print("\n" + "=" * 50)
         print("🎭 FACS Web Server")
         print("=" * 50)
         print(f"\n📱 スマホからアクセス:")
-        print(f"   http://{local_ip}:{port}")
+        print(f"   {protocol}://{local_ip}:{port}")
         print(f"\n💻 このPCからアクセス:")
-        print(f"   http://localhost:{port}")
-        print(f"\n⚠️ 接続できない場合:")
-        print(f"   python web/check_network.py {port}")
+        print(f"   {protocol}://localhost:{port}")
+        
+        if not use_https:
+            print(f"\n⚠️ HTTPではカメラアクセスが制限される場合があります")
+        
         print("\n" + "=" * 50 + "\n")
         
-        # 0.0.0.0 で全インターフェースをリッスン
+        if use_https:
+            cert_dir = Path(__file__).parent / "certs"
+            cert_file, key_file = generate_ssl_cert(cert_dir)
+            if cert_file and key_file:
+                uvicorn.run(
+                    self.app, host=host, port=port,
+                    ssl_certfile=cert_file, ssl_keyfile=key_file,
+                    log_level="info"
+                )
+                return
+            print("❌ HTTPS起動に失敗。HTTPで起動します。")
+        
         uvicorn.run(self.app, host=host, port=port, log_level="info")
 
 

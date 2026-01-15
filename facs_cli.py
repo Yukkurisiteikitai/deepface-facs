@@ -709,7 +709,15 @@ class FACSInteractiveCLI:
         
         from web.server import FACSWebServer
         server = FACSWebServer(recordings_dir=self.recordings_dir)
-        server.run(port=port, use_https=(protocol == "https"))
+        
+        # use_https の有無を確認して呼び出し
+        import inspect
+        sig = inspect.signature(server.run)
+        if 'use_https' in sig.parameters:
+            server.run(port=port, use_https=(protocol == "https"))
+        else:
+            # 古いバージョン対応
+            server.run(port=port)
     
     def _analyze_menu(self):
         """分析メニュー"""
