@@ -70,7 +70,7 @@ Issues = "https://github.com/yourusername/facs-analyzer/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["facsanalyzer*"]  # ディレクトリ名に合わせる
+include = ["facs*"]  # ディレクトリ名に合わせる
 
 [tool.setuptools.package-data]
 facsanalyzer = ["py.typed", "models/*.task"]  # ここも変更
