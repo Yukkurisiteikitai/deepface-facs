@@ -432,8 +432,8 @@ class FACSInteractiveCLI:
     
     def _run_realtime(self, camera: int, mode: str):
         """リアルタイム分析を実行"""
-        from facs import FACSAnalyzer
-        from facs.core.enums import AnalysisMode
+        from facsanalyzer import FACSAnalyzer  # facs → facsanalyzer
+        from facsanalyzer.core.enums import AnalysisMode
         
         mode_map = {
             'fast': AnalysisMode.REALTIME,
@@ -488,10 +488,10 @@ class FACSInteractiveCLI:
     def _run_record(self, output_dir: str, duration: int):
         """記録を実行"""
         import cv2
-        from facs import FACSAnalyzer
-        from facs.recording import FACSRecorder
-        from facs.visualization import FACSVisualizer
-        from facs.core.enums import AnalysisMode
+        from facsanalyzer import FACSAnalyzer
+        from facsanalyzer.recording import FACSRecorder
+        from facsanalyzer.visualization import FACSVisualizer
+        from facsanalyzer.core.enums import AnalysisMode
         
         analyzer = FACSAnalyzer(mode=AnalysisMode.REALTIME)
         visualizer = FACSVisualizer()
@@ -562,8 +562,8 @@ class FACSInteractiveCLI:
         """再生を実行"""
         import cv2
         import numpy as np
-        from facs.recording import FACSPlayer, PlaybackState
-        from facs.visualization import FACSVisualizer
+        from facsanalyzer.recording import FACSPlayer, PlaybackState
+        from facsanalyzer.visualization import FACSVisualizer
         
         player = FACSPlayer(path)
         visualizer = FACSVisualizer()
@@ -629,7 +629,7 @@ class FACSInteractiveCLI:
     def _draw_playback_overlay(self, frame, info):
         """再生オーバーレイを描画"""
         import cv2
-        from facs.recording import PlaybackState
+        from facsanalyzer.recording import PlaybackState
         
         h, w = frame.shape[:2]
         cv2.rectangle(frame, (0, h - 50), (w, h), (0, 0, 0), -1)
@@ -675,7 +675,7 @@ class FACSInteractiveCLI:
     
     def _run_export(self, path: str, resolution: tuple):
         """エクスポートを実行"""
-        from facs.recording import FACSVideoExporter
+        from facsanalyzer.recording import FACSVideoExporter
         
         exporter = FACSVideoExporter(width=resolution[0], height=resolution[1])
         output = exporter.export(path)
@@ -739,7 +739,7 @@ class FACSInteractiveCLI:
     def _run_analyze(self, path: str):
         """分析を実行"""
         import cv2
-        from facs import FACSAnalyzer
+        from facsanalyzer import FACSAnalyzer
         
         p = Path(path)
         analyzer = FACSAnalyzer()
