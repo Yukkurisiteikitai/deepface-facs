@@ -56,24 +56,24 @@ dev = [
     "mypy>=1.0.0",
 ]
 all = [
-    "facs-analyzer[deepface,dev]",
+    "facs[deepface,dev]",
 ]
 
 [project.scripts]
 facs = "facs.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/yourusername/facs-analyzer"
-Documentation = "https://github.com/yourusername/facs-analyzer#readme"
-Repository = "https://github.com/yourusername/facs-analyzer"
-Issues = "https://github.com/yourusername/facs-analyzer/issues"
+Homepage = "https://github.com/Yukkurisiteikitai/deepface-facs"
+Documentation = "https://github.com/Yukkurisiteikitai/deepface-facs#readme"
+Repository = "https://github.com/Yukkurisiteikitai/deepface-facs"
+Issues = "https://github.com/Yukkurisiteikitai/deepface-facs/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["facs*"]  # ディレクトリ名に合わせる
 
 [tool.setuptools.package-data]
-facsanalyzer = ["py.typed", "models/*.task"]  # ここも変更
+facs = ["py.typed", "models/*.task"]  # ここも変更
 
 [tool.black]
 line-length = 100
