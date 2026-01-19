@@ -15,7 +15,7 @@ Example:
 """
 
 __version__ = "0.1.0"
-__author__ = "yuuto"
+__author__ = "Yukkurisiteikitai"
 
 from .core import (
     AUIntensity,
