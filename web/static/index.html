@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FACS Analyzer - Frontend Only</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f0f1a; color: #eee; min-height: 100vh; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 15px; }
+        header { text-align: center; padding: 15px 0; border-bottom: 1px solid #333; margin-bottom: 15px; }
+        header h1 { font-size: 1.8rem; color: #00d4ff; margin-bottom: 5px; }
+        header p { color: #888; font-size: 0.9rem; }
+        nav { margin-top: 10px; }
+        nav a { color: #00d4ff; margin: 0 10px; text-decoration: none; }
+        nav a:hover { text-decoration: underline; }
+        .main-content { display: grid; grid-template-columns: 1fr 320px; gap: 15px; }
+        @media (max-width: 900px) { .main-content { grid-template-columns: 1fr; } }
+        
+        .video-container { position: relative; background: #000; border-radius: 10px; overflow: hidden; aspect-ratio: 16/9; }
+        #videoElement { display: none; }
+        #canvasElement { width: 100%; height: 100%; object-fit: contain; display: none; }
+        .placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #555; gap: 15px; }
+        .placeholder svg { width: 60px; height: 60px; opacity: 0.5; }
+        .controls { position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; }
+        .btn { padding: 10px 20px; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .btn-primary { background: #00d4ff; color: #000; }
+        .btn-primary:hover { background: #00b8e6; transform: scale(1.02); }
+        .btn-danger { background: #ff4757; color: #fff; }
+        .btn-danger:hover { background: #ff3344; }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+        
+        .sidebar { display: flex; flex-direction: column; gap: 12px; }
+        .panel { background: #1a1a2e; border-radius: 10px; padding: 12px; }
+        .panel h2 { font-size: 0.85rem; color: #00d4ff; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid #333; display: flex; align-items: center; gap: 6px; }
+        
+        .status { padding: 8px 12px; border-radius: 6px; text-align: center; font-size: 0.85rem; font-weight: 500; }
+        .status.ready { background: #1e3a5f; color: #00d4ff; }
+        .status.loading { background: #3a3a1e; color: #ffd700; }
+        .status.running { background: #1a4d1a; color: #00ff88; }
+        .status.error { background: #4d1a1a; color: #ff4757; }
+        
+        .facs-code { font-family: 'SF Mono', Monaco, monospace; font-size: 1.3rem; color: #ffd700; background: #0d1117; padding: 12px; border-radius: 6px; text-align: center; letter-spacing: 1px; }
+        .emotion-display { display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #0d1117; border-radius: 6px; margin-top: 8px; }
+        .emotion-name { font-size: 1.1rem; display: flex; align-items: center; gap: 6px; }
+        .emotion-confidence { font-size: 1.2rem; font-weight: bold; color: #00ff88; }
+        
+        .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+        .metric { background: #0d1117; padding: 8px; border-radius: 6px; text-align: center; }
+        .metric-label { font-size: 0.7rem; color: #666; text-transform: uppercase; }
+        .metric-value { font-family: monospace; font-size: 1.1rem; color: #00ff88; margin-top: 2px; }
+        .metric-value.negative { color: #ff6b6b; }
+        
+        .au-list { max-height: 220px; overflow-y: auto; }
+        .au-list::-webkit-scrollbar { width: 4px; }
+        .au-list::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+        .au-item { display: flex; align-items: center; padding: 5px 6px; margin-bottom: 3px; background: #0d1117; border-radius: 4px; font-size: 0.8rem; }
+        .au-code { font-family: monospace; font-weight: bold; color: #00d4ff; width: 38px; }
+        .au-name { flex: 1; color: #888; font-size: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .au-bar { width: 50px; height: 4px; background: #222; border-radius: 2px; margin: 0 6px; overflow: hidden; }
+        .au-bar-fill { height: 100%; background: linear-gradient(90deg, #00d4ff, #00ff88); transition: width 0.15s; }
+        .au-intensity { width: 30px; text-align: right; font-family: monospace; font-size: 0.75rem; color: #aaa; }
+        
+        .toggle-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; font-size: 0.85rem; }
+        .toggle-switch { position: relative; width: 40px; height: 20px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider { position: absolute; cursor: pointer; inset: 0; background: #333; border-radius: 20px; transition: 0.2s; }
+        .toggle-slider:before { content: ""; position: absolute; height: 14px; width: 14px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: 0.2s; }
+        input:checked + .toggle-slider { background: #00d4ff; }
+        input:checked + .toggle-slider:before { transform: translateX(20px); }
+        
+        .no-face { text-align: center; color: #666; padding: 20px; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎭 FACS Analyzer</h1>
+            <p>MediaPipe Face Landmarker - ブラウザのみで動作</p>
+            <nav style="margin-top: 10px;">
+                <a href="index.html" style="color: #00d4ff; margin: 0 10px;">リアルタイム分析</a>
+                <a href="emotion-recorder.html" style="color: #00d4ff; margin: 0 10px;">感情記録</a>
+            </nav>
+        </header>
+        
+        <div class="main-content">
+            <div class="video-container">
+                <video id="videoElement" playsinline></video>
+                <canvas id="canvasElement"></canvas>
+                <div id="placeholder" class="placeholder">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+                    <span>「開始」ボタンでカメラを起動</span>
+                </div>
+                <div class="controls">
+                    <button id="startBtn" class="btn btn-primary">▶ 開始</button>
+                    <button id="stopBtn" class="btn btn-danger" disabled>■ 停止</button>
+                </div>
+            </div>
+            
+            <div class="sidebar">
+                <div class="panel">
+                    <div id="status" class="status ready">準備完了</div>
+                </div>
+                
+                <div class="panel">
+                    <h2>📊 FACS分析</h2>
+                    <div id="facsCode" class="facs-code">---</div>
+                    <div id="emotionDisplay" class="emotion-display">
+                        <span class="emotion-name">😐 neutral</span>
+                        <span class="emotion-confidence">--</span>
+                    </div>
+                    <div class="metrics">
+                        <div class="metric">
+                            <div class="metric-label">Valence</div>
+                            <div id="valence" class="metric-value">--</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Arousal</div>
+                            <div id="arousal" class="metric-value">--</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="panel">
+                    <h2>🎚️ Action Units</h2>
+                    <div id="auList" class="au-list">
+                        <div class="no-face">顔を検出してください</div>
+                    </div>
+                </div>
+                
+                <div class="panel">
+                    <h2>⚙️ 表示設定</h2>
+                    <div class="toggle-item">
+                        <span>ランドマーク</span>
+                        <label class="toggle-switch"><input type="checkbox" id="toggleLandmarks" checked><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-item">
+                        <span>接続線</span>
+                        <label class="toggle-switch"><input type="checkbox" id="toggleConnections" checked><span class="toggle-slider"></span></label>
+                    </div>
+                    <div class="toggle-item">
+                        <span>Blendshapes</span>
+                        <label class="toggle-switch"><input type="checkbox" id="toggleBlendshapes" checked><span class="toggle-slider"></span></label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="js/mediapipe-face.js"></script>
+    <script>
+        const elements = {
+            video: document.getElementById('videoElement'),
+            canvas: document.getElementById('canvasElement'),
+            placeholder: document.getElementById('placeholder'),
+            startBtn: document.getElementById('startBtn'),
+            stopBtn: document.getElementById('stopBtn'),
+            status: document.getElementById('status'),
+            facsCode: document.getElementById('facsCode'),
+            emotionDisplay: document.getElementById('emotionDisplay'),
+            valence: document.getElementById('valence'),
+            arousal: document.getElementById('arousal'),
+            auList: document.getElementById('auList'),
+            toggleLandmarks: document.getElementById('toggleLandmarks'),
+            toggleConnections: document.getElementById('toggleConnections'),
+            toggleBlendshapes: document.getElementById('toggleBlendshapes')
+        };
+        
+        let analyzer = null;
+        
+        const emotionEmojis = {
+            happy: '😊', sad: '😢', angry: '😠', surprise: '😲',
+            fear: '😨', disgust: '🤢', contempt: '😏', neutral: '😐'
+        };
+        
+        const auNames = {
+            'AU1': '眉内側挙上', 'AU2': '眉外側挙上', 'AU4': '眉下制', 'AU5': '上瞼挙上',
+            'AU6': '頬挙上', 'AU7': '瞼緊張', 'AU9': '鼻しわ', 'AU10': '上唇挙上',
+            'AU12': '口角挙上', 'AU14': 'えくぼ', 'AU15': '口角下制', 'AU16': '下唇下制',
+            'AU17': '顎挙上', 'AU18': '口すぼめ', 'AU20': '唇伸展', 'AU22': '口漏斗',
+            'AU23': '唇緊張', 'AU24': '唇圧迫', 'AU26': '顎下制', 'AU29': '顎突出',
+            'AU34': '頬膨張', 'AU45': '瞬き'
+        };
+        
+        elements.startBtn.addEventListener('click', async () => {
+            try {
+                setStatus('初期化中...', 'loading');
+                elements.startBtn.disabled = true;
+                
+                analyzer = new RealtimeFaceAnalyzer({
+                    drawLandmarks: elements.toggleLandmarks.checked,
+                    drawConnections: elements.toggleConnections.checked,
+                    drawBlendshapes: elements.toggleBlendshapes.checked,
+                    onAnalysis: updateAnalysisUI,
+                    onError: (msg, err) => { console.error(msg, err); setStatus('エラー: ' + msg, 'error'); }
+                });
+                
+                await analyzer.start(elements.video, elements.canvas);
+                
+                elements.placeholder.style.display = 'none';
+                elements.canvas.style.display = 'block';
+                elements.stopBtn.disabled = false;
+                setStatus('分析中', 'running');
+            } catch (error) {
+                console.error(error);
+                setStatus('カメラアクセスエラー', 'error');
+                elements.startBtn.disabled = false;
+            }
+        });
+        
+        elements.stopBtn.addEventListener('click', () => {
+            if (analyzer) { analyzer.stop(); analyzer = null; }
+            elements.placeholder.style.display = 'flex';
+            elements.canvas.style.display = 'none';
+            elements.startBtn.disabled = false;
+            elements.stopBtn.disabled = true;
+            setStatus('準備完了', 'ready');
+            resetUI();
+        });
+        
+        elements.toggleLandmarks.addEventListener('change', () => { if (analyzer) analyzer.drawLandmarks = elements.toggleLandmarks.checked; });
+        elements.toggleConnections.addEventListener('change', () => { if (analyzer) analyzer.drawConnections = elements.toggleConnections.checked; });
+        elements.toggleBlendshapes.addEventListener('change', () => { if (analyzer) analyzer.drawBlendshapes = elements.toggleBlendshapes.checked; });
+        
+        function setStatus(text, type) {
+            elements.status.textContent = text;
+            elements.status.className = 'status ' + type;
+        }
+        
+        function updateAnalysisUI(analysis) {
+            if (!analysis) return;
+            
+            elements.facsCode.textContent = analysis.facsCode;
+            
+            const emoji = emotionEmojis[analysis.emotion.name] || '😐';
+            const conf = (analysis.emotion.confidence * 100).toFixed(0);
+            elements.emotionDisplay.innerHTML = `
+                <span class="emotion-name">${emoji} ${analysis.emotion.name}</span>
+                <span class="emotion-confidence">${conf}%</span>
+            `;
+            
+            const vClass = analysis.valence < 0 ? 'metric-value negative' : 'metric-value';
+            elements.valence.className = vClass;
+            elements.valence.textContent = (analysis.valence >= 0 ? '+' : '') + analysis.valence.toFixed(2);
+            elements.arousal.textContent = analysis.arousal.toFixed(2);
+            
+            updateAUList(analysis.actionUnits);
+        }
+        
+        function updateAUList(aus) {
+            const sorted = Object.entries(aus).filter(([,v]) => v > 0.1).sort((a,b) => b[1] - a[1]);
+            
+            if (sorted.length === 0) {
+                elements.auList.innerHTML = '<div class="no-face">アクティブなAUなし</div>';
+                return;
+            }
+            
+            elements.auList.innerHTML = sorted.slice(0, 12).map(([code, value]) => `
+                <div class="au-item">
+                    <span class="au-code">${code}</span>
+                    <span class="au-name">${auNames[code] || ''}</span>
+                    <div class="au-bar"><div class="au-bar-fill" style="width:${value*100}%"></div></div>
+                    <span class="au-intensity">${(value*100).toFixed(0)}%</span>
+                </div>
+            `).join('');
+        }
+        
+        function resetUI() {
+            elements.facsCode.textContent = '---';
+            elements.emotionDisplay.innerHTML = '<span class="emotion-name">😐 neutral</span><span class="emotion-confidence">--</span>';
+            elements.valence.textContent = '--';
+            elements.arousal.textContent = '--';
+            elements.auList.innerHTML = '<div class="no-face">顔を検出してください</div>';
+        }
+    </script>
+</body>
+</html>

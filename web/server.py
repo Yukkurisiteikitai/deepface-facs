@@ -151,6 +151,33 @@ class FACSWebServer:
                     if line.strip():
                         frames.append(json.loads(line))
             return {"frames": frames}
+        
+        @self.app.post("/api/analyze_landmarks")
+        async def analyze_landmarks(request: Request):
+            """フロントエンドからのランドマーク/Blendshapesデータを分析"""
+            try:
+                data = await request.json()
+                blendshapes = data.get("blendshapes", {})
+                
+                action_units = self._blendshapes_to_aus(blendshapes)
+                facs_code = self._generate_facs_code(action_units)
+                emotion = self._estimate_emotion(action_units)
+                valence, arousal = self._calculate_valence_arousal(action_units)
+                
+                return JSONResponse({
+                    "success": True,
+                    "facs_code": facs_code,
+                    "action_units": action_units,
+                    "emotion": emotion,
+                    "valence": valence,
+                    "arousal": arousal,
+                })
+            except Exception as e:
+                return JSONResponse({"success": False, "error": str(e)}, status_code=400)
+        
+        @self.app.get("/api/health")
+        async def health():
+            return {"status": "ok"}
     
     def _get_index_html(self) -> str:
         """メインページのHTML"""

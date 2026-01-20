@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FACS 感情記録 - Emotion Recorder</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #0f0f1a; color: #eee; min-height: 100vh; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 15px; }
+        header { text-align: center; padding: 15px 0; border-bottom: 1px solid #333; margin-bottom: 15px; }
+        header h1 { font-size: 1.6rem; color: #00d4ff; }
+        header p { color: #888; font-size: 0.85rem; margin-top: 5px; }
+        
+        .main-content { display: grid; grid-template-columns: 1fr 380px; gap: 15px; }
+        @media (max-width: 1000px) { .main-content { grid-template-columns: 1fr; } }
+        
+        .video-section { display: flex; flex-direction: column; gap: 15px; }
+        .video-container { position: relative; background: #000; border-radius: 10px; overflow: hidden; aspect-ratio: 16/9; }
+        #videoElement { display: none; }
+        #canvasElement { width: 100%; height: 100%; object-fit: contain; display: none; }
+        .placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #555; gap: 10px; }
+        
+        .emotion-selector { background: #1a1a2e; border-radius: 10px; padding: 15px; }
+        .emotion-selector h3 { font-size: 0.9rem; color: #00d4ff; margin-bottom: 12px; }
+        .emotion-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+        @media (max-width: 600px) { .emotion-grid { grid-template-columns: repeat(2, 1fr); } }
+        
+        .emotion-btn { background: #0d1117; border: 2px solid #333; border-radius: 8px; padding: 12px 8px; cursor: pointer; transition: all 0.2s; text-align: center; }
+        .emotion-btn:hover { border-color: #555; transform: scale(1.02); }
+        .emotion-btn.selected { border-color: var(--emotion-color, #00d4ff); background: rgba(0, 212, 255, 0.1); }
+        .emotion-btn.recording { border-color: #ff4444; animation: pulse-border 1s infinite; }
+        @keyframes pulse-border { 0%, 100% { border-color: #ff4444; } 50% { border-color: #ff8888; } }
+        .emotion-emoji { font-size: 2rem; display: block; margin-bottom: 5px; }
+        .emotion-name { font-size: 0.85rem; color: #ccc; }
+        .emotion-name-en { font-size: 0.7rem; color: #666; }
+        
+        .controls { display: flex; gap: 10px; justify-content: center; margin-top: 10px; }
+        .btn { padding: 12px 24px; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .btn-primary { background: #00d4ff; color: #000; }
+        .btn-record { background: #ff4444; color: #fff; }
+        .btn-stop { background: #666; color: #fff; }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        
+        .sidebar { display: flex; flex-direction: column; gap: 12px; }
+        .panel { background: #1a1a2e; border-radius: 10px; padding: 12px; }
+        .panel h2 { font-size: 0.85rem; color: #00d4ff; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid #333; }
+        
+        .status { padding: 10px; border-radius: 6px; text-align: center; font-weight: 500; }
+        .status.idle { background: #1e3a5f; color: #00d4ff; }
+        .status.recording { background: #4d1a1a; color: #ff4444; animation: pulse-bg 1s infinite; }
+        @keyframes pulse-bg { 0%, 100% { background: #4d1a1a; } 50% { background: #6d2a2a; } }
+        
+        .expected-aus { margin-top: 10px; }
+        .au-tag { display: inline-block; background: #0d1117; padding: 4px 8px; border-radius: 4px; margin: 2px; font-size: 0.75rem; }
+        .au-tag.typical { border-left: 3px solid #00ff88; }
+        .au-tag.optional { border-left: 3px solid #ffaa00; }
+        .au-tag.detected { background: #1a4d1a; }
+        
+        .match-score { font-size: 2rem; font-weight: bold; text-align: center; margin: 15px 0; }
+        .match-score.high { color: #00ff88; }
+        .match-score.medium { color: #ffaa00; }
+        .match-score.low { color: #ff4444; }
+        
+        .recording-info { font-size: 0.85rem; color: #888; text-align: center; }
+        .recording-info .time { font-size: 1.2rem; color: #ff4444; font-family: monospace; }
+        
+        .history-list { max-height: 200px; overflow-y: auto; }
+        .history-item { background: #0d1117; padding: 8px; border-radius: 6px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
+        .history-emotion { display: flex; align-items: center; gap: 8px; }
+        .history-score { font-family: monospace; }
+        
+        .recommendation { background: #0d1117; padding: 10px; border-radius: 6px; font-size: 0.8rem; color: #aaa; line-height: 1.5; }
+        .recommendation li { margin-left: 15px; margin-bottom: 5px; }
+        
+        .download-btn { width: 100%; margin-top: 10px; background: #333; color: #fff; }
+        .download-btn:hover { background: #444; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎭 FACS 感情記録</h1>
+            <p>表情から感情とAction Unitの対応を記録・学習</p>
+        </header>
+        
+        <div class="main-content">
+            <div class="video-section">
+                <div class="video-container">
+                    <video id="videoElement" playsinline></video>
+                    <canvas id="canvasElement"></canvas>
+                    <div id="placeholder" class="placeholder">
+                        <span style="font-size: 3rem;">📹</span>
+                        <span>感情を選択してカメラを起動</span>
+                    </div>
+                </div>
+                
+                <div class="emotion-selector">
+                    <h3>📊 記録する感情を選択</h3>
+                    <div id="emotionGrid" class="emotion-grid"></div>
+                    <div class="controls">
+                        <button id="startCameraBtn" class="btn btn-primary" disabled>📷 カメラ起動</button>
+                        <button id="startRecordBtn" class="btn btn-record" disabled>⏺ 記録開始</button>
+                        <button id="stopRecordBtn" class="btn btn-stop" disabled>⏹ 記録停止</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="sidebar">
+                <div class="panel">
+                    <div id="status" class="status idle">感情を選択してください</div>
+                </div>
+                
+                <div class="panel" id="targetPanel" style="display: none;">
+                    <h2>🎯 目標Action Units</h2>
+                    <p id="emotionDescription" style="font-size: 0.8rem; color: #888; margin-bottom: 10px;"></p>
+                    <div class="expected-aus">
+                        <div style="font-size: 0.75rem; color: #00ff88; margin-bottom: 5px;">必須AU:</div>
+                        <div id="typicalAUs"></div>
+                        <div style="font-size: 0.75rem; color: #ffaa00; margin-top: 8px; margin-bottom: 5px;">補助AU:</div>
+                        <div id="optionalAUs"></div>
+                    </div>
+                </div>
+                
+                <div class="panel" id="scorePanel" style="display: none;">
+                    <h2>📈 一致スコア</h2>
+                    <div id="matchScore" class="match-score">--</div>
+                    <div id="recordingInfo" class="recording-info"></div>
+                </div>
+                
+                <div class="panel" id="resultPanel" style="display: none;">
+                    <h2>📋 記録結果</h2>
+                    <div id="recommendation" class="recommendation"></div>
+                </div>
+                
+                <div class="panel">
+                    <h2>📜 記録履歴</h2>
+                    <div id="historyList" class="history-list">
+                        <div style="color: #666; text-align: center; padding: 20px;">記録がありません</div>
+                    </div>
+                    <button id="downloadBtn" class="btn download-btn" disabled>💾 JSONダウンロード</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="js/mediapipe-face.js"></script>
+    <script src="js/emotion-recorder.js"></script>
+    <script>
+        const elements = {
+            video: document.getElementById('videoElement'),
+            canvas: document.getElementById('canvasElement'),
+            placeholder: document.getElementById('placeholder'),
+            emotionGrid: document.getElementById('emotionGrid'),
+            startCameraBtn: document.getElementById('startCameraBtn'),
+            startRecordBtn: document.getElementById('startRecordBtn'),
+            stopRecordBtn: document.getElementById('stopRecordBtn'),
+            status: document.getElementById('status'),
+            targetPanel: document.getElementById('targetPanel'),
+            emotionDescription: document.getElementById('emotionDescription'),
+            typicalAUs: document.getElementById('typicalAUs'),
+            optionalAUs: document.getElementById('optionalAUs'),
+            scorePanel: document.getElementById('scorePanel'),
+            matchScore: document.getElementById('matchScore'),
+            recordingInfo: document.getElementById('recordingInfo'),
+            resultPanel: document.getElementById('resultPanel'),
+            recommendation: document.getElementById('recommendation'),
+            historyList: document.getElementById('historyList'),
+            downloadBtn: document.getElementById('downloadBtn')
+        };
+        
+        let analyzer = null;
+        let recorder = new EmotionRecorder();
+        let selectedEmotion = null;
+        let recordingTimer = null;
+        let recordingStartTime = 0;
+        
+        // 感情グリッドを生成
+        function initEmotionGrid() {
+            const emotions = recorder.getEmotionList();
+            elements.emotionGrid.innerHTML = emotions.map(e => `
+                <div class="emotion-btn" data-emotion="${e.id}" style="--emotion-color: ${e.color}">
+                    <span class="emotion-emoji">${e.emoji}</span>
+                    <span class="emotion-name">${e.name}</span>
+                    <span class="emotion-name-en">${e.id}</span>
+                </div>
+            `).join('');
+            
+            // クリックイベント
+            elements.emotionGrid.querySelectorAll('.emotion-btn').forEach(btn => {
+                btn.addEventListener('click', () => selectEmotion(btn.dataset.emotion));
+            });
+        }
+        
+        // 感情を選択
+        function selectEmotion(emotionId) {
+            selectedEmotion = emotionId;
+            const emotion = recorder.emotions[emotionId];
+            
+            // ボタン状態更新
+            elements.emotionGrid.querySelectorAll('.emotion-btn').forEach(btn => {
+                btn.classList.toggle('selected', btn.dataset.emotion === emotionId);
+            });
+            
+            // パネル表示
+            elements.targetPanel.style.display = 'block';
+            elements.emotionDescription.textContent = emotion.description;
+            elements.typicalAUs.innerHTML = emotion.typicalAUs.map(au => 
+                `<span class="au-tag typical" data-au="${au}">${au} ${recorder.getAUName(au)}</span>`
+            ).join('') || '<span style="color: #666;">なし</span>';
+            elements.optionalAUs.innerHTML = emotion.optionalAUs.map(au => 
+                `<span class="au-tag optional" data-au="${au}">${au} ${recorder.getAUName(au)}</span>`
+            ).join('') || '<span style="color: #666;">なし</span>';
+            
+            elements.startCameraBtn.disabled = false;
+            setStatus(`${emotion.emoji} ${emotion.name} を選択`, 'idle');
+        }
+        
+        // カメラ起動
+        elements.startCameraBtn.addEventListener('click', async () => {
+            if (!selectedEmotion) return;
+            
+            try {
+                setStatus('カメラ起動中...', 'idle');
+                
+                analyzer = new RealtimeFaceAnalyzer({
+                    drawLandmarks: true,
+                    drawConnections: true,
+                    drawBlendshapes: false,
+                    onAnalysis: handleAnalysis,
+                    onError: (msg, err) => console.error(msg, err)
+                });
+                
+                await analyzer.start(elements.video, elements.canvas);
+                
+                elements.placeholder.style.display = 'none';
+                elements.canvas.style.display = 'block';
+                elements.startCameraBtn.disabled = true;
+                elements.startRecordBtn.disabled = false;
+                elements.scorePanel.style.display = 'block';
+                
+                const emotion = recorder.emotions[selectedEmotion];
+                setStatus(`${emotion.emoji} ${emotion.name} - 準備完了`, 'idle');
+            } catch (error) {
+                console.error(error);
+                setStatus('カメラエラー', 'idle');
+            }
+        });
+        
+        // 記録開始
+        elements.startRecordBtn.addEventListener('click', () => {
+            if (!selectedEmotion || !analyzer) return;
+            
+            recorder.startSession(selectedEmotion);
+            recordingStartTime = Date.now();
+            
+            elements.startRecordBtn.disabled = true;
+            elements.stopRecordBtn.disabled = false;
+            elements.resultPanel.style.display = 'none';
+            
+            // 選択中の感情ボタンを記録中表示に
+            elements.emotionGrid.querySelector(`[data-emotion="${selectedEmotion}"]`).classList.add('recording');
+            
+            const emotion = recorder.emotions[selectedEmotion];
+            setStatus(`⏺ ${emotion.emoji} ${emotion.name} を記録中...`, 'recording');
+            
+            // タイマー更新
+            recordingTimer = setInterval(updateRecordingTime, 100);
+        });
+        
+        // 記録停止
+        elements.stopRecordBtn.addEventListener('click', () => {
+            const session = recorder.stopSession();
+            
+            clearInterval(recordingTimer);
+            elements.startRecordBtn.disabled = false;
+            elements.stopRecordBtn.disabled = true;
+            elements.emotionGrid.querySelector('.recording')?.classList.remove('recording');
+            
+            const emotion = recorder.emotions[selectedEmotion];
+            setStatus(`${emotion.emoji} ${emotion.name} - 記録完了`, 'idle');
+            
+            // 結果表示
+            showResult(session);
+            updateHistory();
+        });
+        
+        // 分析結果処理
+        function handleAnalysis(analysis) {
+            if (!analysis) return;
+            
+            // 記録中ならフレームを記録
+            if (recorder.isRecording) {
+                const frame = recorder.recordFrame(analysis);
+                updateMatchScore(frame.matchScore);
+                updateAUDetection(analysis.actionUnits);
+            } else if (selectedEmotion) {
+                // プレビュー表示
+                const tempScore = recorder.calculateMatchScore.call(
+                    { currentSession: { metadata: { expectedAUs: recorder.emotions[selectedEmotion].typicalAUs } } },
+                    analysis.actionUnits
+                );
+                updateMatchScore(tempScore);
+                updateAUDetection(analysis.actionUnits);
+            }
+        }
+        
+        // 一致スコア更新
+        function updateMatchScore(score) {
+            const percent = (score * 100).toFixed(0);
+            elements.matchScore.textContent = `${percent}%`;
+            elements.matchScore.className = 'match-score ' + (score >= 0.6 ? 'high' : score >= 0.3 ? 'medium' : 'low');
+        }
+        
+        // AU検出状態更新
+        function updateAUDetection(actionUnits) {
+            elements.targetPanel.querySelectorAll('.au-tag').forEach(tag => {
+                const au = tag.dataset.au;
+                const detected = actionUnits[au] && actionUnits[au] > 0.2;
+                tag.classList.toggle('detected', detected);
+            });
+        }
+        
+        // 記録時間更新
+        function updateRecordingTime() {
+            const elapsed = (Date.now() - recordingStartTime) / 1000;
+            const frames = recorder.currentSession?.frames.length || 0;
+            elements.recordingInfo.innerHTML = `
+                <div class="time">${elapsed.toFixed(1)}秒</div>
+                <div>${frames} フレーム</div>
+            `;
+        }
+        
+        // 結果表示
+        function showResult(session) {
+            if (!session || !session.summary) return;
+            
+            elements.resultPanel.style.display = 'block';
+            const recs = session.summary.recommendation || [];
+            elements.recommendation.innerHTML = '<ul>' + recs.map(r => `<li>${r}</li>`).join('') + '</ul>';
+        }
+        
+        // 履歴更新
+        function updateHistory() {
+            if (recorder.recordings.length === 0) {
+                elements.historyList.innerHTML = '<div style="color: #666; text-align: center; padding: 20px;">記録がありません</div>';
+                elements.downloadBtn.disabled = true;
+                return;
+            }
+            
+            elements.historyList.innerHTML = recorder.recordings.map((r, i) => {
+                const emotion = recorder.emotions[r.emotion];
+                const score = r.summary ? (r.summary.avgMatchScore * 100).toFixed(0) : '--';
+                return `
+                    <div class="history-item">
+                        <div class="history-emotion">
+                            <span>${emotion.emoji}</span>
+                            <span>${emotion.name}</span>
+                        </div>
+                        <div>
+                            <span class="history-score">${score}%</span>
+                            <span style="color: #666; font-size: 0.75rem;">${r.frames.length}f</span>
+                        </div>
+                    </div>
+                `;
+            }).reverse().join('');
+            
+            elements.downloadBtn.disabled = false;
+        }
+        
+        // ダウンロード
+        elements.downloadBtn.addEventListener('click', () => {
+            const timestamp = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '');
+            recorder.downloadRecordings(`facs_emotion_${timestamp}.json`);
+        });
+        
+        // ステータス更新
+        function setStatus(text, type) {
+            elements.status.textContent = text;
+            elements.status.className = 'status ' + type;
+        }
+        
+        // 初期化
+        initEmotionGrid();
+    </script>
+</body>
+</html>

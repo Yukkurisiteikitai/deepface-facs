@@ -432,8 +432,8 @@ class FACSInteractiveCLI:
     
     def _run_realtime(self, camera: int, mode: str):
         """リアルタイム分析を実行"""
-        from facsanalyzer import FACSAnalyzer  # facs → facsanalyzer
-        from facsanalyzer.core.enums import AnalysisMode
+        from facs import FACSAnalyzer  # facs → facs
+        from facs.core.enums import AnalysisMode
         
         mode_map = {
             'fast': AnalysisMode.REALTIME,
@@ -488,10 +488,10 @@ class FACSInteractiveCLI:
     def _run_record(self, output_dir: str, duration: int):
         """記録を実行"""
         import cv2
-        from facsanalyzer import FACSAnalyzer
-        from facsanalyzer.recording import FACSRecorder
-        from facsanalyzer.visualization import FACSVisualizer
-        from facsanalyzer.core.enums import AnalysisMode
+        from facs import FACSAnalyzer
+        from facs.recording import FACSRecorder
+        from facs.visualization import FACSVisualizer
+        from facs.core.enums import AnalysisMode
         
         analyzer = FACSAnalyzer(mode=AnalysisMode.REALTIME)
         visualizer = FACSVisualizer()
@@ -562,8 +562,8 @@ class FACSInteractiveCLI:
         """再生を実行"""
         import cv2
         import numpy as np
-        from facsanalyzer.recording import FACSPlayer, PlaybackState
-        from facsanalyzer.visualization import FACSVisualizer
+        from facs.recording import FACSPlayer, PlaybackState
+        from facs.visualization import FACSVisualizer
         
         player = FACSPlayer(path)
         visualizer = FACSVisualizer()
@@ -629,7 +629,7 @@ class FACSInteractiveCLI:
     def _draw_playback_overlay(self, frame, info):
         """再生オーバーレイを描画"""
         import cv2
-        from facsanalyzer.recording import PlaybackState
+        from facs.recording import PlaybackState
         
         h, w = frame.shape[:2]
         cv2.rectangle(frame, (0, h - 50), (w, h), (0, 0, 0), -1)
@@ -675,7 +675,7 @@ class FACSInteractiveCLI:
     
     def _run_export(self, path: str, resolution: tuple):
         """エクスポートを実行"""
-        from facsanalyzer.recording import FACSVideoExporter
+        from facs.recording import FACSVideoExporter
         
         exporter = FACSVideoExporter(width=resolution[0], height=resolution[1])
         output = exporter.export(path)
@@ -691,8 +691,8 @@ class FACSInteractiveCLI:
     def _server_menu(self):
         """サーバーメニュー"""
         menu = TerminalMenu("Webサーバー設定", [
-            ("🔓 HTTP (ポート8000)", ("http", 8000)),
-            ("🔒 HTTPS (ポート8443)", ("https", 8443)),
+            ("🌐 HTTP (ポート8000)", ("http", 8000)),
+            ("🌐 HTTP (ポート3000)", ("http", 3000)),
         ], show_back=True)
         
         choice = menu.show()
@@ -703,21 +703,22 @@ class FACSInteractiveCLI:
         
         self._clear_screen()
         print(f"\n🌐 Webサーバーを起動します...")
-        print(f"   プロトコル: {protocol.upper()}")
-        print(f"   ポート: {port}")
-        print("\n   Ctrl+Cで停止\n")
+        print(f"   URL: http://localhost:{port}")
+        print(f"\n   ブラウザでアクセスしてください")
+        print("   Ctrl+Cで停止\n")
         
-        from web.server import FACSWebServer
-        server = FACSWebServer(recordings_dir=self.recordings_dir)
-        
-        # use_https の有無を確認して呼び出し
-        import inspect
-        sig = inspect.signature(server.run)
-        if 'use_https' in sig.parameters:
-            server.run(port=port, use_https=(protocol == "https"))
-        else:
-            # 古いバージョン対応
-            server.run(port=port)
+        try:
+            from web.server import FACSWebServer
+            server = FACSWebServer(recordings_dir=self.recordings_dir)
+            server.run(port=port, debug=False)
+        except ImportError as e:
+            print(f"エラー: Webサーバーモジュールが見つかりません: {e}")
+            print("flask と flask-cors をインストールしてください:")
+            print("  pip install flask flask-cors")
+            self._wait_key()
+        except Exception as e:
+            print(f"エラー: {e}")
+            self._wait_key()
     
     def _analyze_menu(self):
         """分析メニュー"""
@@ -739,7 +740,7 @@ class FACSInteractiveCLI:
     def _run_analyze(self, path: str):
         """分析を実行"""
         import cv2
-        from facsanalyzer import FACSAnalyzer
+        from facs import FACSAnalyzer
         
         p = Path(path)
         analyzer = FACSAnalyzer()
