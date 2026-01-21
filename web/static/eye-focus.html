@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FACS Eye Analyzer - 目の分析</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #0a0a15; color: #eee; min-height: 100vh; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 15px; }
+        header { text-align: center; padding: 15px 0; border-bottom: 1px solid #333; margin-bottom: 15px; }
+        header h1 { font-size: 1.6rem; color: #00d4ff; }
+        header p { color: #888; font-size: 0.85rem; margin-top: 5px; }
+        nav { margin-top: 10px; }
+        nav a { color: #00d4ff; margin: 0 10px; text-decoration: none; }
+        nav a:hover { text-decoration: underline; }
+        
+        .main-content { display: grid; grid-template-columns: 1fr 350px; gap: 15px; }
+        @media (max-width: 1000px) { .main-content { grid-template-columns: 1fr; } }
+        
+        .video-section { display: flex; flex-direction: column; gap: 15px; }
+        .video-container { position: relative; background: #000; border-radius: 10px; overflow: hidden; aspect-ratio: 16/9; }
+        #videoElement { display: none; }
+        #canvasElement { width: 100%; height: 100%; object-fit: contain; display: none; }
+        .placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #555; gap: 10px; }
+        
+        .eye-display { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .eye-panel { background: #1a1a2e; border-radius: 10px; padding: 15px; text-align: center; }
+        .eye-panel h3 { font-size: 0.9rem; color: #00d4ff; margin-bottom: 10px; }
+        .eye-canvas { width: 100%; aspect-ratio: 2/1; background: #0d1117; border-radius: 8px; }
+        .eye-value { font-size: 2rem; font-weight: bold; margin: 10px 0; }
+        .eye-value.open { color: #00ff88; }
+        .eye-value.closed { color: #ff4444; }
+        .eye-value.narrow { color: #ffaa00; }
+        .eye-bar { height: 8px; background: #333; border-radius: 4px; overflow: hidden; margin-top: 10px; }
+        .eye-bar-fill { height: 100%; transition: width 0.1s, background 0.3s; }
+        
+        .controls { display: flex; gap: 10px; justify-content: center; }
+        .btn { padding: 10px 20px; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; }
+        .btn-primary { background: #00d4ff; color: #000; }
+        .btn-secondary { background: #333; color: #fff; }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        
+        .sidebar { display: flex; flex-direction: column; gap: 12px; }
+        .panel { background: #1a1a2e; border-radius: 10px; padding: 12px; }
+        .panel h2 { font-size: 0.85rem; color: #00d4ff; margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 6px; }
+        
+        .calibration-status { padding: 10px; border-radius: 6px; text-align: center; margin-bottom: 10px; }
+        .calibration-status.pending { background: #3a3a1e; color: #ffaa00; }
+        .calibration-status.complete { background: #1a4d1a; color: #00ff88; }
+        .calibration-bar { height: 6px; background: #333; border-radius: 3px; overflow: hidden; margin-top: 8px; }
+        .calibration-bar-fill { height: 100%; background: #ffaa00; transition: width 0.3s; }
+        
+        .eye-type { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 10px; background: #0d1117; border-radius: 6px; margin-top: 10px; }
+        .eye-type-icon { font-size: 1.5rem; }
+        .eye-type-label { font-size: 0.9rem; }
+        
+        .gaze-indicator { position: relative; width: 100px; height: 100px; margin: 10px auto; background: #0d1117; border-radius: 50%; border: 2px solid #333; }
+        .gaze-dot { position: absolute; width: 16px; height: 16px; background: #00d4ff; border-radius: 50%; transform: translate(-50%, -50%); transition: all 0.1s; }
+        .gaze-center { position: absolute; width: 6px; height: 6px; background: #666; border-radius: 50%; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        .gaze-direction { text-align: center; margin-top: 10px; font-size: 0.85rem; color: #888; }
+        
+        .au-list { max-height: 250px; overflow-y: auto; }
+        .au-item { display: flex; align-items: center; padding: 6px; margin-bottom: 4px; background: #0d1117; border-radius: 4px; font-size: 0.8rem; }
+        .au-code { font-family: monospace; font-weight: bold; color: #00d4ff; width: 45px; }
+        .au-name { flex: 1; color: #888; font-size: 0.75rem; }
+        .au-bar { width: 60px; height: 5px; background: #222; border-radius: 2px; margin: 0 6px; overflow: hidden; }
+        .au-bar-fill { height: 100%; background: linear-gradient(90deg, #00d4ff, #00ff88); }
+        .au-value { width: 35px; text-align: right; font-family: monospace; font-size: 0.75rem; }
+        
+        .brow-indicator { display: flex; justify-content: space-around; margin-top: 10px; }
+        .brow { text-align: center; }
+        .brow-visual { font-size: 1.5rem; transition: transform 0.2s; }
+        .brow-label { font-size: 0.7rem; color: #666; margin-top: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>👁️ FACS Eye Analyzer</h1>
+            <p>目の動きに特化した分析 - 細い目にも対応</p>
+            <nav>
+                <a href="index.html">リアルタイム分析</a>
+                <a href="emotion-recorder.html">感情記録</a>
+                <a href="eye-focus.html">目の分析</a>
+            </nav>
+        </header>
+        
+        <div class="main-content">
+            <div class="video-section">
+                <div class="video-container">
+                    <video id="videoElement" playsinline></video>
+                    <canvas id="canvasElement"></canvas>
+                    <div id="placeholder" class="placeholder">
+                        <span style="font-size: 3rem;">👁️</span>
+                        <span>「開始」ボタンでカメラを起動</span>
+                    </div>
+                </div>
+                
+                <div class="eye-display">
+                    <div class="eye-panel">
+                        <h3>左目 (Left Eye)</h3>
+                        <canvas id="leftEyeCanvas" class="eye-canvas"></canvas>
+                        <div id="leftEyeValue" class="eye-value">--</div>
+                        <div class="eye-bar"><div id="leftEyeBar" class="eye-bar-fill"></div></div>
+                    </div>
+                    <div class="eye-panel">
+                        <h3>右目 (Right Eye)</h3>
+                        <canvas id="rightEyeCanvas" class="eye-canvas"></canvas>
+                        <div id="rightEyeValue" class="eye-value">--</div>
+                        <div class="eye-bar"><div id="rightEyeBar" class="eye-bar-fill"></div></div>
+                    </div>
+                </div>
+                
+                <div class="controls">
+                    <button id="startBtn" class="btn btn-primary">▶ 開始</button>
+                    <button id="stopBtn" class="btn btn-secondary" disabled>■ 停止</button>
+                    <button id="recalibBtn" class="btn btn-secondary" disabled>🔄 再キャリブレーション</button>
+                </div>
+            </div>
+            
+            <div class="sidebar">
+                <div class="panel">
+                    <h2>🎯 キャリブレーション</h2>
+                    <div id="calibrationStatus" class="calibration-status pending">
+                        普通に画面を見てください...
+                    </div>
+                    <div class="calibration-bar">
+                        <div id="calibrationBar" class="calibration-bar-fill" style="width: 0%"></div>
+                    </div>
+                    <div id="eyeType" class="eye-type" style="display: none;">
+                        <span class="eye-type-icon">👁️</span>
+                        <span class="eye-type-label">通常の目</span>
+                    </div>
+                </div>
+                
+                <div class="panel">
+                    <h2>👀 視線方向</h2>
+                    <div class="gaze-indicator">
+                        <div class="gaze-center"></div>
+                        <div id="gazeDot" class="gaze-dot" style="top: 50%; left: 50%;"></div>
+                    </div>
+                    <div id="gazeDirection" class="gaze-direction">中央</div>
+                </div>
+                
+                <div class="panel">
+                    <h2>🎚️ 眉の状態</h2>
+                    <div class="brow-indicator">
+                        <div class="brow">
+                            <div id="leftBrowVisual" class="brow-visual">🤨</div>
+                            <div class="brow-label">左眉</div>
+                        </div>
+                        <div class="brow">
+                            <div id="rightBrowVisual" class="brow-visual">🤨</div>
+                            <div class="brow-label">右眉</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="panel">
+                    <h2>📊 目関連AU</h2>
+                    <div id="auList" class="au-list">
+                        <div style="color: #666; text-align: center; padding: 20px;">検出待機中</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="js/mediapipe-face.js"></script>
+    <script src="js/eye-analyzer.js"></script>
+    <script>
+        const elements = {
+            video: document.getElementById('videoElement'),
+            canvas: document.getElementById('canvasElement'),
+            placeholder: document.getElementById('placeholder'),
+            startBtn: document.getElementById('startBtn'),
+            stopBtn: document.getElementById('stopBtn'),
+            recalibBtn: document.getElementById('recalibBtn'),
+            leftEyeCanvas: document.getElementById('leftEyeCanvas'),
+            rightEyeCanvas: document.getElementById('rightEyeCanvas'),
+            leftEyeValue: document.getElementById('leftEyeValue'),
+            rightEyeValue: document.getElementById('rightEyeValue'),
+            leftEyeBar: document.getElementById('leftEyeBar'),
+            rightEyeBar: document.getElementById('rightEyeBar'),
+            calibrationStatus: document.getElementById('calibrationStatus'),
+            calibrationBar: document.getElementById('calibrationBar'),
+            eyeType: document.getElementById('eyeType'),
+            gazeDot: document.getElementById('gazeDot'),
+            gazeDirection: document.getElementById('gazeDirection'),
+            leftBrowVisual: document.getElementById('leftBrowVisual'),
+            rightBrowVisual: document.getElementById('rightBrowVisual'),
+            auList: document.getElementById('auList')
+        };
+        
+        let detector = null;
+        let eyeAnalyzer = null;
+        let isRunning = false;
+        let animationId = null;
+        
+        const auNames = {
+            'AU1': '眉内側挙上', 'AU2': '眉外側挙上', 'AU4': '眉下制',
+            'AU5': '上瞼挙上', 'AU6': '頬挙上', 'AU7': '瞼緊張',
+            'AU43': '目閉じ', 'AU45': '瞬き',
+            'AU61': '視線上', 'AU62': '視線下', 'AU63': '視線左', 'AU64': '視線右'
+        };
+        
+        elements.startBtn.addEventListener('click', async () => {
+            try {
+                elements.startBtn.disabled = true;
+                
+                detector = new MediaPipeFaceDetector();
+                await detector.initialize();
+                
+                eyeAnalyzer = new EyeAnalyzer();
+                
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' }
+                });
+                
+                elements.video.srcObject = stream;
+                await elements.video.play();
+                
+                elements.canvas.width = elements.video.videoWidth;
+                elements.canvas.height = elements.video.videoHeight;
+                
+                elements.placeholder.style.display = 'none';
+                elements.canvas.style.display = 'block';
+                elements.stopBtn.disabled = false;
+                elements.recalibBtn.disabled = false;
+                
+                isRunning = true;
+                processFrame();
+            } catch (error) {
+                console.error(error);
+                elements.startBtn.disabled = false;
+                alert('カメラの起動に失敗しました');
+            }
+        });
+        
+        elements.stopBtn.addEventListener('click', () => {
+            isRunning = false;
+            if (animationId) cancelAnimationFrame(animationId);
+            if (elements.video.srcObject) {
+                elements.video.srcObject.getTracks().forEach(t => t.stop());
+            }
+            if (detector) detector.close();
+            
+            elements.placeholder.style.display = 'flex';
+            elements.canvas.style.display = 'none';
+            elements.startBtn.disabled = false;
+            elements.stopBtn.disabled = true;
+            elements.recalibBtn.disabled = true;
+        });
+        
+        elements.recalibBtn.addEventListener('click', () => {
+            if (eyeAnalyzer) {
+                eyeAnalyzer.resetCalibration();
+                elements.calibrationStatus.textContent = '再キャリブレーション中...';
+                elements.calibrationStatus.className = 'calibration-status pending';
+                elements.eyeType.style.display = 'none';
+            }
+        });
+        
+        async function processFrame() {
+            if (!isRunning) return;
+            
+            const ctx = elements.canvas.getContext('2d');
+            ctx.drawImage(elements.video, 0, 0);
+            
+            try {
+                const results = detector.detect(elements.video);
+                
+                if (results.faceLandmarks.length > 0) {
+                    const landmarks = results.faceLandmarks[0];
+                    const blendshapes = results.faceBlendshapes[0] || {};
+                    
+                    // 目の分析
+                    const eyeResult = eyeAnalyzer.analyze(landmarks, blendshapes);
+                    
+                    if (eyeResult) {
+                        // メインキャンバスに目を描画
+                        drawEyesOnCanvas(ctx, landmarks, eyeResult);
+                        
+                        // UI更新
+                        updateEyeDisplay(eyeResult);
+                        updateCalibrationUI(eyeResult.calibration);
+                        updateGazeUI(eyeResult.gaze);
+                        updateBrowUI(eyeResult.brows);
+                        updateAUList(eyeResult.actionUnits);
+                    }
+                }
+            } catch (error) {
+                console.error('Frame error:', error);
+            }
+            
+            animationId = requestAnimationFrame(processFrame);
+        }
+        
+        function drawEyesOnCanvas(ctx, landmarks, eyeResult) {
+            // 目のランドマークを強調表示
+            ctx.fillStyle = '#00ff88';
+            ctx.strokeStyle = '#00d4ff';
+            ctx.lineWidth = 2;
+            
+            // 左目
+            const leftIndices = [362, 382, 381, 380, 374, 373, 390, 249, 263, 466, 388, 387, 386, 385, 384, 398];
+            drawEyeOutline(ctx, landmarks, leftIndices);
+            
+            // 右目
+            const rightIndices = [33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246];
+            drawEyeOutline(ctx, landmarks, rightIndices);
+            
+            // 瞳を描画
+            drawPupil(ctx, landmarks[468], eyeResult.leftEye);
+            drawPupil(ctx, landmarks[473], eyeResult.rightEye);
+        }
+        
+        function drawEyeOutline(ctx, landmarks, indices) {
+            ctx.beginPath();
+            indices.forEach((idx, i) => {
+                const p = landmarks[idx];
+                const x = p.x * elements.canvas.width;
+                const y = p.y * elements.canvas.height;
+                i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            });
+            ctx.closePath();
+            ctx.stroke();
+        }
+        
+        function drawPupil(ctx, pupil, eyeData) {
+            const x = pupil.x * elements.canvas.width;
+            const y = pupil.y * elements.canvas.height;
+            const radius = 8;
+            
+            // 開き具合で色を変える
+            const openness = eyeData.normalizedOpenness;
+            const hue = 120 * openness; // 0=赤, 120=緑
+            ctx.fillStyle = `hsl(${hue}, 100%, 50%)`;
+            
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        function updateEyeDisplay(eyeResult) {
+            // 左目
+            const leftVal = (eyeResult.leftEye.normalizedOpenness * 100).toFixed(0);
+            elements.leftEyeValue.textContent = `${leftVal}%`;
+            elements.leftEyeValue.className = 'eye-value ' + getOpennessClass(eyeResult.leftEye.normalizedOpenness);
+            elements.leftEyeBar.style.width = `${leftVal}%`;
+            elements.leftEyeBar.style.background = getOpennessColor(eyeResult.leftEye.normalizedOpenness);
+            
+            // 右目
+            const rightVal = (eyeResult.rightEye.normalizedOpenness * 100).toFixed(0);
+            elements.rightEyeValue.textContent = `${rightVal}%`;
+            elements.rightEyeValue.className = 'eye-value ' + getOpennessClass(eyeResult.rightEye.normalizedOpenness);
+            elements.rightEyeBar.style.width = `${rightVal}%`;
+            elements.rightEyeBar.style.background = getOpennessColor(eyeResult.rightEye.normalizedOpenness);
+        }
+        
+        function getOpennessClass(value) {
+            if (value > 0.6) return 'open';
+            if (value < 0.2) return 'closed';
+            return 'narrow';
+        }
+        
+        function getOpennessColor(value) {
+            if (value > 0.6) return '#00ff88';
+            if (value < 0.2) return '#ff4444';
+            return '#ffaa00';
+        }
+        
+        function updateCalibrationUI(calibration) {
+            elements.calibrationBar.style.width = `${calibration.progress * 100}%`;
+            
+            if (calibration.isCalibrated) {
+                elements.calibrationStatus.textContent = 'キャリブレーション完了';
+                elements.calibrationStatus.className = 'calibration-status complete';
+                elements.calibrationBar.style.background = '#00ff88';
+                
+                elements.eyeType.style.display = 'flex';
+                const isNarrow = calibration.eyeType === 'narrow';
+                elements.eyeType.querySelector('.eye-type-icon').textContent = isNarrow ? '😑' : '👁️';
+                elements.eyeType.querySelector('.eye-type-label').textContent = isNarrow ? '細い目タイプ（感度UP）' : '通常タイプ';
+            } else {
+                elements.calibrationStatus.textContent = `キャリブレーション中... (${Math.round(calibration.progress * 100)}%)`;
+            }
+        }
+        
+        function updateGazeUI(gaze) {
+            // 視線ドットの位置を更新
+            const dotX = 50 + gaze.horizontal * 200;
+            const dotY = 50 + gaze.vertical * 200;
+            elements.gazeDot.style.left = `${Math.max(10, Math.min(90, dotX))}%`;
+            elements.gazeDot.style.top = `${Math.max(10, Math.min(90, dotY))}%`;
+            
+            // 方向テキスト
+            let direction = '';
+            if (gaze.verticalDirection === 'up') direction += '上';
+            else if (gaze.verticalDirection === 'down') direction += '下';
+            if (gaze.direction === 'left') direction += '左';
+            else if (gaze.direction === 'right') direction += '右';
+            if (!direction) direction = '中央';
+            if (gaze.isLookingAtCamera) direction = '👀 カメラ目線';
+            
+            elements.gazeDirection.textContent = direction;
+        }
+        
+        function updateBrowUI(brows) {
+            // 眉の状態を絵文字で表現
+            const getBrowEmoji = (brow) => {
+                if (brow.isRaised) return '😲';
+                if (brow.isLowered) return '😠';
+                return '😐';
+            };
+            
+            elements.leftBrowVisual.textContent = getBrowEmoji(brows.left);
+            elements.rightBrowVisual.textContent = getBrowEmoji(brows.right);
+            
+            // 眉の上下をtransformで表現
+            const getTransform = (brow) => {
+                if (brow.isRaised) return 'translateY(-5px)';
+                if (brow.isLowered) return 'translateY(5px)';
+                return 'translateY(0)';
+            };
+            
+            elements.leftBrowVisual.style.transform = getTransform(brows.left);
+            elements.rightBrowVisual.style.transform = getTransform(brows.right);
+        }
+        
+        function updateAUList(aus) {
+            const sorted = Object.entries(aus)
+                .filter(([, v]) => v > 0.1)
+                .sort((a, b) => b[1] - a[1]);
+            
+            if (sorted.length === 0) {
+                elements.auList.innerHTML = '<div style="color: #666; text-align: center; padding: 20px;">アクティブなAUなし</div>';
+                return;
+            }
+            
+            elements.auList.innerHTML = sorted.map(([code, value]) => `
+                <div class="au-item">
+                    <span class="au-code">${code}</span>
+                    <span class="au-name">${auNames[code] || ''}</span>
+                    <div class="au-bar"><div class="au-bar-fill" style="width:${value*100}%"></div></div>
+                    <span class="au-value">${(value*100).toFixed(0)}%</span>
+                </div>
+            `).join('');
+        }
+    </script>
+</body>
+</html>
