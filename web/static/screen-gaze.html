@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>視線マウスカーソル & ヒートマップ</title>
+    <style>
+        :root {
+            --bg-dark: #0a0a0f;
+            --bg-card: #1a1a2e;
+            --text-primary: #ffffff;
+            --text-secondary: #888;
+            --accent: #00ff88;
+            --accent-2: #ff6b6b;
+            --accent-3: #4ecdc4;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+        
+        /* ナビゲーション */
+        .nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            gap: 20px;
+            padding: 15px 30px;
+            background: linear-gradient(180deg, rgba(0,0,0,0.9) 0%, transparent 100%);
+            z-index: 1000;
+        }
+        
+        .nav a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+        
+        .nav a:hover {
+            color: var(--text-primary);
+            background: rgba(255,255,255,0.1);
+        }
+        
+        .nav a.active {
+            color: var(--accent);
+            background: rgba(0, 255, 136, 0.1);
+        }
+        
+        /* メインコンテナ */
+        .container {
+            display: flex;
+            height: 100vh;
+            padding-top: 60px;
+        }
+        
+        /* ビデオエリア */
+        .video-area {
+            width: 300px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .video-container {
+            position: relative;
+            border-radius: 12px;
+            overflow: hidden;
+            background: var(--bg-card);
+        }
+        
+        #video {
+            width: 100%;
+            transform: scaleX(-1);
+            display: block;
+        }
+        
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            transform: scaleX(-1);
+            pointer-events: none;
+        }
+        
+        /* コントロールパネル */
+        .control-panel {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 20px;
+        }
+        
+        .control-panel h3 {
+            color: var(--accent);
+            margin-bottom: 15px;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 10px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: var(--accent);
+            color: #000;
+        }
+        
+        .btn-primary:hover {
+            background: #00cc6a;
+            transform: translateY(-2px);
+        }
+        
+        .btn-secondary {
+            background: rgba(255,255,255,0.1);
+            color: var(--text-primary);
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(255,255,255,0.2);
+        }
+        
+        .btn-danger {
+            background: var(--accent-2);
+            color: #fff;
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        /* ステータス表示 */
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #666;
+        }
+        
+        .status-dot.active {
+            background: var(--accent);
+            box-shadow: 0 0 10px var(--accent);
+        }
+        
+        .status-dot.calibrating {
+            background: #ffaa00;
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        /* スライダー */
+        .slider-group {
+            margin-bottom: 15px;
+        }
+        
+        .slider-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+        
+        .slider-group input[type="range"] {
+            width: 100%;
+            accent-color: var(--accent);
+        }
+        
+        /* メインエリア（視線追跡エリア） */
+        .main-area {
+            flex: 1;
+            position: relative;
+        }
+        
+        /* 視線カーソル */
+        #gaze-cursor {
+            position: fixed;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 3px solid var(--accent);
+            background: rgba(0, 255, 136, 0.2);
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            z-index: 9999;
+            display: none;
+            transition: width 0.1s, height 0.1s, opacity 0.1s;
+        }
+        
+        #gaze-cursor.low-confidence {
+            border-color: rgba(0, 255, 136, 0.3);
+            background: rgba(0, 255, 136, 0.05);
+        }
+        
+        #gaze-cursor::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 6px;
+            height: 6px;
+            background: var(--accent);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+        
+        /* ヒートマップオーバーレイ */
+        #heatmap-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+            opacity: 0.7;
+            display: none;
+        }
+        
+        /* キャリブレーションオーバーレイ */
+        #calibration-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 10000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+        
+        #calibration-overlay.active {
+            display: flex;
+        }
+        
+        .calibration-point {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: var(--accent);
+            display: none;
+            cursor: pointer;
+            animation: calibPulse 1s infinite;
+        }
+        
+        .calibration-point.active {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .calibration-point::after {
+            content: '';
+            width: 8px;
+            height: 8px;
+            background: #000;
+            border-radius: 50%;
+        }
+        
+        @keyframes calibPulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 20px var(--accent); }
+            50% { transform: scale(1.2); box-shadow: 0 0 40px var(--accent); }
+        }
+        
+        .calibration-message {
+            color: var(--text-primary);
+            font-size: 24px;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .calibration-progress {
+            display: flex;
+            gap: 8px;
+            margin-top: 20px;
+        }
+        
+        .calibration-progress .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.3);
+        }
+        
+        .calibration-progress .dot.complete {
+            background: var(--accent);
+        }
+        
+        /* 統計パネル */
+        .stats-panel {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 20px;
+        }
+        
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .stat-item:last-child {
+            border-bottom: none;
+        }
+        
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+        
+        .stat-value {
+            color: var(--accent);
+            font-weight: bold;
+        }
+        
+        /* ターゲットボタン（デモ用） */
+        .demo-targets {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 50px;
+            z-index: 50;
+        }
+        
+        .demo-target {
+            width: 80px;
+            height: 80px;
+            border-radius: 12px;
+            background: var(--bg-card);
+            border: 2px solid rgba(255,255,255,0.2);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .demo-target:hover {
+            border-color: var(--accent);
+            transform: scale(1.1);
+        }
+        
+        .demo-target.gazed {
+            background: rgba(0, 255, 136, 0.3);
+            border-color: var(--accent);
+        }
+        
+        /* チェックボックス */
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            padding: 10px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+        }
+        
+        .checkbox-group input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--accent);
+        }
+        
+        .checkbox-group label {
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <!-- ナビゲーション -->
+    <nav class="nav">
+        <a href="index.html">🏠 ホーム</a>
+        <a href="eye-focus.html">👁️ 目の分析</a>
+        <a href="advanced-eye.html">🔬 高度な目分析</a>
+        <a href="screen-gaze.html" class="active">🎯 視線カーソル</a>
+    </nav>
+    
+    <!-- 視線カーソル -->
+    <div id="gaze-cursor"></div>
+    
+    <!-- ヒートマップオーバーレイ -->
+    <canvas id="heatmap-overlay"></canvas>
+    
+    <!-- キャリブレーションオーバーレイ -->
+    <div id="calibration-overlay">
+        <div class="calibration-message" id="calibration-message">
+            緑の点を見つめてクリックしてください
+        </div>
+        <div class="calibration-point" id="calibration-point"></div>
+        <div class="calibration-progress" id="calibration-progress"></div>
+    </div>
+    
+    <div class="container">
+        <!-- 左サイドバー -->
+        <div class="video-area">
+            <div class="video-container">
+                <video id="video" autoplay playsinline></video>
+                <canvas id="overlay"></canvas>
+            </div>
+            
+            <div class="control-panel">
+                <h3>🎮 コントロール</h3>
+                
+                <div class="status-indicator">
+                    <div class="status-dot" id="status-dot"></div>
+                    <span id="status-text">初期化中...</span>
+                </div>
+                
+                <button class="btn btn-primary" id="btn-calibrate">
+                    🎯 キャリブレーション開始
+                </button>
+                
+                <button class="btn btn-secondary" id="btn-toggle-cursor" disabled>
+                    👆 カーソル表示
+                </button>
+                
+                <div class="checkbox-group">
+                    <input type="checkbox" id="chk-heatmap">
+                    <label for="chk-heatmap">ヒートマップ表示</label>
+                </div>
+                
+                <div class="checkbox-group">
+                    <input type="checkbox" id="chk-decay">
+                    <label for="chk-decay">ヒートマップ減衰</label>
+                </div>
+                
+                <button class="btn btn-danger" id="btn-clear-heatmap">
+                    🗑️ ヒートマップクリア
+                </button>
+                
+                <button class="btn btn-secondary" id="btn-export">
+                    📥 データエクスポート
+                </button>
+            </div>
+            
+            <div class="control-panel">
+                <h3>⚙️ 設定</h3>
+                
+                <div class="slider-group">
+                    <label>スムージング強度: <span id="smoothing-value">0.7</span></label>
+                    <input type="range" id="slider-smoothing" min="0" max="1" step="0.1" value="0.7">
+                </div>
+                
+                <div class="slider-group">
+                    <label>カーソルサイズ: <span id="cursor-size-value">40</span>px</label>
+                    <input type="range" id="slider-cursor-size" min="20" max="100" step="5" value="40">
+                </div>
+                
+                <div class="slider-group">
+                    <label>ヒートマップ半径: <span id="heatmap-radius-value">50</span>px</label>
+                    <input type="range" id="slider-heatmap-radius" min="20" max="150" step="10" value="50">
+                </div>
+            </div>
+            
+            <div class="stats-panel">
+                <h3>📊 統計</h3>
+                
+                <div class="stat-item">
+                    <span class="stat-label">視線ポイント数</span>
+                    <span class="stat-value" id="stat-points">0</span>
+                </div>
+                
+                <div class="stat-item">
+                    <span class="stat-label">画面カバー率</span>
+                    <span class="stat-value" id="stat-coverage">0%</span>
+                </div>
+                
+                <div class="stat-item">
+                    <span class="stat-label">信頼度</span>
+                    <span class="stat-value" id="stat-confidence">-</span>
+                </div>
+                
+                <div class="stat-item">
+                    <span class="stat-label">平均位置X</span>
+                    <span class="stat-value" id="stat-avg-x">-</span>
+                </div>
+                
+                <div class="stat-item">
+                    <span class="stat-label">平均位置Y</span>
+                    <span class="stat-value" id="stat-avg-y">-</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- メインエリア -->
+        <div class="main-area">
+            <div class="demo-targets" id="demo-targets">
+                <div class="demo-target" data-id="1">🍎</div>
+                <div class="demo-target" data-id="2">🍊</div>
+                <div class="demo-target" data-id="3">🍋</div>
+                <div class="demo-target" data-id="4">🍇</div>
+                <div class="demo-target" data-id="5">🍓</div>
+                <div class="demo-target" data-id="6">🍑</div>
+                <div class="demo-target" data-id="7">🥝</div>
+                <div class="demo-target" data-id="8">🍒</div>
+                <div class="demo-target" data-id="9">🥭</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- モジュール -->
+    <script src="js/screen-gaze.js"></script>
+    <script src="js/gaze-heatmap.js"></script>
+    
+    <script>
+        // MediaPipe classes (動的インポートで取得)
+        let FaceLandmarker, FilesetResolver;
+        
+        // 要素取得
+        const video = document.getElementById('video');
+        const overlay = document.getElementById('overlay');
+        const gazeCursor = document.getElementById('gaze-cursor');
+        const heatmapCanvas = document.getElementById('heatmap-overlay');
+        const calibrationOverlay = document.getElementById('calibration-overlay');
+        const calibrationPoint = document.getElementById('calibration-point');
+        const calibrationMessage = document.getElementById('calibration-message');
+        const calibrationProgress = document.getElementById('calibration-progress');
+        
+        // 状態
+        let faceLandmarker = null;
+        let screenGazeTracker = null;
+        let gazeHeatmap = null;
+        let isRunning = false;
+        let showCursor = false;
+        let showHeatmap = false;
+        let enableDecay = false;
+        
+        // キャリブレーション状態
+        let calibrationPoints = [];
+        let currentCalibPoint = 0;
+        let collectingSamples = false;
+        let calibrationSamples = [];
+        
+        // UIを更新
+        function updateStatus(text, state = 'inactive') {
+            document.getElementById('status-text').textContent = text;
+            const dot = document.getElementById('status-dot');
+            dot.classList.remove('active', 'calibrating');
+            if (state === 'active') dot.classList.add('active');
+            if (state === 'calibrating') dot.classList.add('calibrating');
+        }
+        
+        // 初期化
+        async function init() {
+            updateStatus('カメラを起動中...', 'calibrating');
+            
+            try {
+                // カメラ起動
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 640, height: 480 }
+                });
+                video.srcObject = stream;
+                
+                await new Promise(resolve => video.onloadedmetadata = resolve);
+                
+                overlay.width = video.videoWidth;
+                overlay.height = video.videoHeight;
+                
+                // ヒートマップキャンバス設定
+                heatmapCanvas.width = window.innerWidth;
+                heatmapCanvas.height = window.innerHeight;
+                
+                // MediaPipe初期化（動的インポート）
+                updateStatus('MediaPipe読み込み中...', 'calibrating');
+                
+                const vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest');
+                FaceLandmarker = vision.FaceLandmarker;
+                FilesetResolver = vision.FilesetResolver;
+                
+                const filesetResolver = await FilesetResolver.forVisionTasks(
+                    'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
+                );
+                
+                faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
+                    baseOptions: {
+                        modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
+                        delegate: 'GPU'
+                    },
+                    runningMode: 'VIDEO',
+                    numFaces: 1,
+                    outputFaceBlendshapes: false,
+                    outputFacialTransformationMatrixes: false
+                });
+                
+                // トラッカー初期化
+                screenGazeTracker = new ScreenGazeTracker({
+                    screenWidth: window.innerWidth,
+                    screenHeight: window.innerHeight,
+                    smoothingFactor: 0.7
+                });
+                
+                // ヒートマップ初期化
+                gazeHeatmap = new GazeHeatmap({
+                    width: window.innerWidth,
+                    height: window.innerHeight,
+                    radius: 50
+                });
+                gazeHeatmap.setOutputCanvas(heatmapCanvas);
+                
+                // キャリブレーションポイントを生成
+                generateCalibrationPoints();
+                
+                updateStatus('準備完了', 'active');
+                document.getElementById('btn-calibrate').disabled = false;
+                
+                // メインループ開始
+                isRunning = true;
+                processFrame();
+                
+            } catch (error) {
+                console.error('初期化エラー:', error);
+                updateStatus('エラー: ' + error.message, 'inactive');
+            }
+        }
+        
+        // キャリブレーションポイントを生成
+        function generateCalibrationPoints() {
+            const padding = 100;
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+            
+            calibrationPoints = [
+                { x: padding, y: padding },                    // 左上
+                { x: w / 2, y: padding },                      // 上中央
+                { x: w - padding, y: padding },                // 右上
+                { x: padding, y: h / 2 },                      // 左中央
+                { x: w / 2, y: h / 2 },                        // 中央
+                { x: w - padding, y: h / 2 },                  // 右中央
+                { x: padding, y: h - padding },                // 左下
+                { x: w / 2, y: h - padding },                  // 下中央
+                { x: w - padding, y: h - padding }             // 右下
+            ];
+            
+            // プログレスドット生成
+            calibrationProgress.innerHTML = calibrationPoints.map((_, i) => 
+                `<div class="dot" data-index="${i}"></div>`
+            ).join('');
+        }
+        
+        // キャリブレーション開始
+        function startCalibration() {
+            screenGazeTracker.startCalibration();
+            currentCalibPoint = 0;
+            calibrationOverlay.classList.add('active');
+            calibrationMessage.textContent = '緑の点を見つめてクリックしてください';
+            showCalibrationPoint(currentCalibPoint);
+            updateStatus('キャリブレーション中...', 'calibrating');
+        }
+        
+        // キャリブレーションポイントを表示
+        function showCalibrationPoint(index) {
+            if (index >= calibrationPoints.length) {
+                finishCalibration();
+                return;
+            }
+            
+            const point = calibrationPoints[index];
+            calibrationPoint.style.left = point.x + 'px';
+            calibrationPoint.style.top = point.y + 'px';
+            calibrationPoint.classList.add('active');
+            
+            collectingSamples = false;
+            calibrationSamples = [];
+            
+            // プログレス更新
+            document.querySelectorAll('.calibration-progress .dot').forEach((dot, i) => {
+                dot.classList.toggle('complete', i < index);
+            });
+        }
+        
+        // キャリブレーションポイントクリック
+        calibrationPoint.addEventListener('click', () => {
+            if (!collectingSamples) {
+                collectingSamples = true;
+                calibrationSamples = [];
+                calibrationMessage.textContent = 'そのまま見つめてください... (サンプル収集中)';
+                
+                // 1秒間サンプル収集
+                setTimeout(() => {
+                    if (calibrationSamples.length >= 10) {
+                        // サンプルの平均を取得
+                        const avgGaze = {
+                            x: calibrationSamples.reduce((s, g) => s + g.x, 0) / calibrationSamples.length,
+                            y: calibrationSamples.reduce((s, g) => s + g.y, 0) / calibrationSamples.length
+                        };
+                        
+                        screenGazeTracker.addCalibrationPoint(
+                            avgGaze, 
+                            calibrationPoints[currentCalibPoint]
+                        );
+                    }
+                    
+                    currentCalibPoint++;
+                    collectingSamples = false;
+                    calibrationMessage.textContent = '緑の点を見つめてクリックしてください';
+                    showCalibrationPoint(currentCalibPoint);
+                }, 1000);
+            }
+        });
+        
+        // キャリブレーション完了
+        function finishCalibration() {
+            screenGazeTracker.finishCalibration();
+            calibrationOverlay.classList.remove('active');
+            calibrationPoint.classList.remove('active');
+            
+            updateStatus('キャリブレーション完了', 'active');
+            document.getElementById('btn-toggle-cursor').disabled = false;
+            
+            // 自動的にカーソルを有効化
+            showCursor = true;
+            gazeCursor.style.display = 'block';
+            document.getElementById('btn-toggle-cursor').textContent = '👆 カーソル非表示';
+        }
+        
+        // フレーム処理
+        function processFrame() {
+            if (!isRunning) return;
+            
+            const ctx = overlay.getContext('2d');
+            ctx.clearRect(0, 0, overlay.width, overlay.height);
+            
+            if (faceLandmarker && video.readyState >= 2) {
+                const results = faceLandmarker.detectForVideo(video, performance.now());
+                
+                if (results.faceLandmarks && results.faceLandmarks.length > 0) {
+                    const landmarks = results.faceLandmarks[0];
+                    
+                    // ランドマーク描画（目の周り）
+                    drawEyeLandmarks(ctx, landmarks);
+                    
+                    // 視線更新
+                    const gazeData = screenGazeTracker.update(landmarks);
+                    
+                    // キャリブレーション中のサンプル収集
+                    if (collectingSamples && gazeData.rawGaze) {
+                        calibrationSamples.push(gazeData.rawGaze);
+                    }
+                    
+                    // キャリブレーション済みの場合
+                    if (screenGazeTracker.isCalibrated && gazeData.screenPosition) {
+                        const pos = gazeData.screenPosition;
+                        
+                        // カーソル更新
+                        if (showCursor) {
+                            gazeCursor.style.left = pos.x + 'px';
+                            gazeCursor.style.top = pos.y + 'px';
+                            gazeCursor.classList.toggle('low-confidence', gazeData.confidence < 0.5);
+                        }
+                        
+                        // ヒートマップにポイント追加
+                        gazeHeatmap.addPoint(pos.x, pos.y, gazeData.confidence);
+                        
+                        // デモターゲットの判定
+                        checkDemoTargets(pos.x, pos.y);
+                        
+                        // 統計更新
+                        document.getElementById('stat-confidence').textContent = 
+                            (gazeData.confidence * 100).toFixed(0) + '%';
+                    }
+                }
+            }
+            
+            // ヒートマップ描画
+            if (showHeatmap) {
+                if (enableDecay) {
+                    gazeHeatmap.applyDecay();
+                }
+                gazeHeatmap.render();
+            }
+            
+            // 統計更新
+            const stats = gazeHeatmap.computeStatistics();
+            document.getElementById('stat-points').textContent = stats.totalPoints;
+            document.getElementById('stat-coverage').textContent = 
+                (stats.coverage * 100).toFixed(1) + '%';
+            document.getElementById('stat-avg-x').textContent = 
+                stats.avgPosition.x.toFixed(0);
+            document.getElementById('stat-avg-y').textContent = 
+                stats.avgPosition.y.toFixed(0);
+            
+            requestAnimationFrame(processFrame);
+        }
+        
+        // 目のランドマーク描画
+        function drawEyeLandmarks(ctx, landmarks) {
+            const leftIrisIndices = [468, 469, 470, 471, 472];
+            const rightIrisIndices = [473, 474, 475, 476, 477];
+            
+            ctx.fillStyle = '#00ff88';
+            
+            [...leftIrisIndices, ...rightIrisIndices].forEach(idx => {
+                const point = landmarks[idx];
+                ctx.beginPath();
+                ctx.arc(point.x * overlay.width, point.y * overlay.height, 2, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+        
+        // デモターゲットの視線判定
+        function checkDemoTargets(gazeX, gazeY) {
+            document.querySelectorAll('.demo-target').forEach(target => {
+                const rect = target.getBoundingClientRect();
+                const margin = 40;
+                
+                const isLooking = gazeX >= rect.left - margin &&
+                                 gazeX <= rect.right + margin &&
+                                 gazeY >= rect.top - margin &&
+                                 gazeY <= rect.bottom + margin;
+                
+                target.classList.toggle('gazed', isLooking);
+            });
+        }
+        
+        // イベントリスナー
+        document.getElementById('btn-calibrate').addEventListener('click', startCalibration);
+        
+        document.getElementById('btn-toggle-cursor').addEventListener('click', () => {
+            showCursor = !showCursor;
+            gazeCursor.style.display = showCursor ? 'block' : 'none';
+            document.getElementById('btn-toggle-cursor').textContent = 
+                showCursor ? '👆 カーソル非表示' : '👆 カーソル表示';
+        });
+        
+        document.getElementById('chk-heatmap').addEventListener('change', (e) => {
+            showHeatmap = e.target.checked;
+            heatmapCanvas.style.display = showHeatmap ? 'block' : 'none';
+        });
+        
+        document.getElementById('chk-decay').addEventListener('change', (e) => {
+            enableDecay = e.target.checked;
+        });
+        
+        document.getElementById('btn-clear-heatmap').addEventListener('click', () => {
+            gazeHeatmap.clearIntensityMap();
+            const ctx = heatmapCanvas.getContext('2d');
+            ctx.clearRect(0, 0, heatmapCanvas.width, heatmapCanvas.height);
+        });
+        
+        document.getElementById('btn-export').addEventListener('click', () => {
+            const data = gazeHeatmap.exportData();
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `gaze-data-${Date.now()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+        
+        // スライダー
+        document.getElementById('slider-smoothing').addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            document.getElementById('smoothing-value').textContent = value;
+            if (screenGazeTracker) {
+                screenGazeTracker.config.smoothingFactor = value;
+            }
+        });
+        
+        document.getElementById('slider-cursor-size').addEventListener('input', (e) => {
+            const value = parseInt(e.target.value);
+            document.getElementById('cursor-size-value').textContent = value;
+            gazeCursor.style.width = value + 'px';
+            gazeCursor.style.height = value + 'px';
+        });
+        
+        document.getElementById('slider-heatmap-radius').addEventListener('input', (e) => {
+            const value = parseInt(e.target.value);
+            document.getElementById('heatmap-radius-value').textContent = value;
+            if (gazeHeatmap) {
+                gazeHeatmap.config.radius = value;
+            }
+        });
+        
+        // リサイズ対応
+        window.addEventListener('resize', () => {
+            heatmapCanvas.width = window.innerWidth;
+            heatmapCanvas.height = window.innerHeight;
+            if (screenGazeTracker) {
+                screenGazeTracker.config.screenWidth = window.innerWidth;
+                screenGazeTracker.config.screenHeight = window.innerHeight;
+            }
+            if (gazeHeatmap) {
+                gazeHeatmap.resize(window.innerWidth, window.innerHeight);
+            }
+            generateCalibrationPoints();
+        });
+        
+        // 開始
+        init();
+    </script>
+</body>
+</html>
